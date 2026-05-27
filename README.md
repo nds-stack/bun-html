@@ -349,18 +349,16 @@ app.get('/', (c) => {
 
 ## Benchmarks
 
-> **Methodology:** Each library renders each template 5,000 iterations (100 warmup) using their **default rendering mode**. ejs and Handlebars pre-compile via `.compile()`. bun-html caches compiled JS functions (`new Function()`) by default. Mustache re-parses every call (no compilation). Results in ops/sec (higher is better).
+> **Methodology:** Each library renders each template 5,000 iterations (100 warmup) using their **default rendering mode**. ejs and Handlebars pre-compile via `.compile()`. bun-html caches compiled JS functions (`new Function()`) by default. Mustache re-parses every call (no compilation). Benchmark auto-stops if 1,000 iterations exceed 10 seconds. Results in ops/sec (higher is better). Run on Bun 1.3.14, Windows 11, Intel i7-13700H.
 
 | Template | @nds-stack/bun-html | ejs | handlebars | mustache |
 |---|---|---|---|---|
-| Variable | 1.7M | 560K | 208K | 717K |
-| Loop (3 items) | 1.4M | 257K | 276K | 313K |
-| Conditional + expression | 9.9M | 666K | 665K | 580K |
-| Combined | 2.5M | 221K | 336K | 396K |
+| Variable | 995K | 1.0M | 456K | 639K |
+| Loop (3 items) | 688K | 324K | 268K | 403K |
+| Conditional + expression | 1.9M | 1.1M | 458K | 1.2M |
+| Combined | 823K | 275K | 283K | 675K |
 
-> **All libraries are on equal footing:** ejs and Handlebars also compile to JS functions — bun-html is just faster at it thanks to Bun's optimized `new Function()` and native `Bun.escapeHTML()`.
-
-Run `bun run bench` in your environment for current results.
+> **All libraries are on equal footing:** ejs and Handlebars also compile to JS functions — bun-html competes head-to-head with ejs on Variable, wins on Loop (+112%) and Combined (+199%). Both leverage `new Function()` + `Bun.escapeHTML()`. Handlebars and Mustache are slower due to heavier runtime overhead and re-parsing (Mustache).
 
 ## Real-World Example
 
