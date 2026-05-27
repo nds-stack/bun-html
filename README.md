@@ -166,8 +166,8 @@ interface RenderOptions {
 
 - File-based partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
-- Expression support limited to conditionals (`{{#if}}`, `{{#unless}}`) — variable interpolation uses simple path resolution
-- `{{../var}}` in conditionals only supports simple parent access, not compound expressions (`../age > 18` works but not `../user.age > 18 && ../active`)
+- Compiled path (default): full expression support in variables and conditionals (`{{name.toUpperCase()}}`, `{{count + 1}}`, `{{age >= 18 ? "adult" : "minor"}}`)
+- Async path (with `partialsDir`): expression support limited to conditionals; variable interpolation uses simple path resolution
 - Custom delimiters not supported (uses `{{}}` exclusively)
 - No browser build (requires Bun/Node.js runtime)
 

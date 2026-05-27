@@ -61,8 +61,9 @@ export function clearCache(): void {
 }
 
 export function purgeTemplate(template: string): boolean {
-  templateCache.delete(template)
-  return compiledCache.delete(template)
+  const a = templateCache.delete(template)
+  const b = compiledCache.delete(template)
+  return a || b
 }
 
 export function compile(template: string, options?: RenderOptions): ASTNode[] {
@@ -172,7 +173,7 @@ async function renderNodeAsync(
 
       let output = ''
       for (let i = 0; i < entries.length; i++) {
-        const newCtx = { index: i, key: keys[i], stack: [...(ctx.stack ?? []), entries[i]], defs: ctx.defs }
+        const newCtx = { index: i, key: keys[i], stack: [...(ctx.stack ?? []), data], defs: ctx.defs }
         for (const child of node.children) {
           output += await renderNodeAsync(child, entries[i], options, newCtx)
         }
@@ -215,7 +216,7 @@ async function renderNodeAsync(
       const sub = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (sub === null || sub === undefined || typeof sub !== 'object') return ''
       let output = ''
-      const newCtx = { stack: [...(ctx.stack ?? []), sub], defs: ctx.defs }
+      const newCtx = { stack: [...(ctx.stack ?? []), data], defs: ctx.defs }
       for (const child of node.children) {
         output += await renderNodeAsync(child, sub, options, newCtx)
       }

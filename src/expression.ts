@@ -304,8 +304,7 @@ export function evaluateExpr(
         if (part === '@key') { value = key; break }
         if (part === 'this') continue
         if (value === null || value === undefined) return undefined
-        if (typeof value !== 'object') return undefined
-        value = (value as Record<string, unknown>)[part]
+        value = (value as any)?.[part]
       }
       return value
     }
