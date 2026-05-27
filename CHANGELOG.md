@@ -9,6 +9,14 @@
 ### Changed
 - Context tracking now uses `__s` stack for proper multilevel parent resolution
 
+### Fixed
+- Number tokenizer no longer greedily consumes `+`/`-` operators (`1+2` now parses correctly)
+- `../@index` and `../@key` now throw clear error instead of returning wrong value
+- Hono adapter `any` type replaced with typed `MinimalContext` interface
+- Layout name validation rejects malformed syntax (`{{#layout "name" extra}}`)
+- Hono adapter `dir` option now correctly mapped to `partialsDir`
+- `evaluateExpr()` (async path) now supports `../` parent context in expressions
+
 ## [0.1.0-alpha.1] — 2026-05-27
 
 ### Added
