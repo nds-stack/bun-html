@@ -19,7 +19,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build:cli": "bun build ./src/cli.ts --outdir ./dist --target bun --format esm",
+    "build:cli": "bun build ./src/cli.ts --outdir ./dist --target bun --format esm && bun run fix:shebang",
+    "fix:shebang": "bun -e \"const fs=require('fs');const c=fs.readFileSync('dist/cli.js','utf8');fs.writeFileSync('dist/cli.js','#!/usr/bin/env bun\\n'+c.replace('// @bun\\n',''))\"",
     "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target bun --format esm && bun run build:cli && tsc -p tsconfig.build.json",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
