@@ -24,6 +24,12 @@ export interface ASTNodeLayout { type: 'Layout'; name: string; children: ASTNode
 
 export type ASTNode = ASTNodeText | ASTNodeVariable | ASTNodeRawVariable | ASTNodeEach | ASTNodeIf | ASTNodeUnless | ASTNodePartial | ASTNodeLayout
 
+export type CompiledTemplate = (
+  data: unknown,
+  helpers: Record<string, (this: unknown, ...args: unknown[]) => unknown> | undefined,
+  escapeHTML: (s: string) => string,
+) => string
+
 export interface RenderOptions {
   partialsDir?: string
   cache?: boolean

@@ -1,7 +1,8 @@
-import type { ASTNode, ASTNodeIf, ASTNodeUnless, RenderOptions } from './types.js'
+import type { ASTNode, ASTNodeIf, ASTNodeUnless, RenderOptions, CompiledTemplate } from './types.js'
 import { tokenize } from './lexer.js'
 import { parse } from './parser.js'
 import { evaluateExpr } from './expression.js'
+import { compileToFunction } from './compiler.js'
 
 const DEFAULT_CACHE_SIZE = 100
 
@@ -50,15 +51,18 @@ function validatePartialName(name: string): void {
 }
 
 const templateCache = new BoundedCache<string, ASTNode[]>()
+const compiledCache = new BoundedCache<string, CompiledTemplate>()
 const partialCache = new BoundedCache<string, ASTNode[]>()
 
 export function clearCache(): void {
   templateCache.clear()
+  compiledCache.clear()
   partialCache.clear()
 }
 
 export function purgeTemplate(template: string): boolean {
-  return templateCache.delete(template)
+  templateCache.delete(template)
+  return compiledCache.delete(template)
 }
 
 export function compile(template: string, options?: RenderOptions): ASTNode[] {
@@ -85,13 +89,28 @@ export function render(
 ): string | Promise<string> {
   const opts: RenderOptions = options ?? {}
 
-  const ast = compile(template, opts)
-
   if (opts.partialsDir) {
+    const ast = compile(template, opts)
     return renderAsync(ast, data, opts)
   }
 
-  return renderSync(ast, data, opts)
+  const doCache = opts.cache !== false
+  let fn: CompiledTemplate
+
+  if (doCache) {
+    fn = compiledCache.get(template)!
+    if (!fn) {
+      const ast = parse(tokenize(template))
+      fn = compileToFunction(ast)
+      compiledCache.set(template, fn)
+    }
+  } else {
+    const ast = parse(tokenize(template))
+    fn = compileToFunction(ast)
+  }
+
+  const esc = opts.autoescape !== false ? Bun.escapeHTML : (s: string): string => s
+  return fn(data, opts.helpers, esc)
 }
 
 function getConditionValue(
@@ -104,98 +123,6 @@ function getConditionValue(
     return evaluateExpr(node.exprAst, data, index, key)
   }
   return resolveValue(node.expression, data, index, key)
-}
-
-function renderSync(ast: ASTNode[], data: unknown, options: RenderOptions): string {
-  let output = ''
-  for (const node of ast) {
-    output += renderNodeSync(node, data, options, {})
-  }
-  return output
-}
-
-function renderNodeSync(
-  node: ASTNode,
-  data: unknown,
-  options: RenderOptions,
-  ctx: { index?: number; key?: string },
-): string {
-  switch (node.type) {
-    case 'Text':
-      return node.value
-
-    case 'Variable': {
-      let value = resolveValue(node.expression, data, ctx.index, ctx.key)
-      if (value === undefined) {
-        const helper = options.helpers?.[node.expression]
-        if (helper) value = helper.call(data)
-      }
-      if (value === null || value === undefined) return ''
-      const str = String(value)
-      return options.autoescape !== false ? Bun.escapeHTML(str) : str
-    }
-
-    case 'RawVariable': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key)
-      if (value === null || value === undefined) return ''
-      return String(value)
-    }
-
-    case 'Each': {
-      const raw = resolveValue(node.expression, data, ctx.index, ctx.key)
-      if (!raw || typeof raw !== 'object') return ''
-
-      const entries = Array.isArray(raw) ? raw : Object.values(raw)
-      const keys = Array.isArray(raw)
-        ? entries.map((_, i) => String(i))
-        : Object.keys(raw)
-
-      let output = ''
-      for (let i = 0; i < entries.length; i++) {
-        for (const child of node.children) {
-          output += renderNodeSync(child, entries[i], options, { index: i, key: keys[i] })
-        }
-      }
-      return output
-    }
-
-    case 'If': {
-      const value = getConditionValue(node, data, ctx.index, ctx.key)
-      if (value) {
-        let output = ''
-        for (const child of node.children) {
-          output += renderNodeSync(child, data, options, ctx)
-        }
-        return output
-      }
-      if (node.elseChildren.length > 0) {
-        let output = ''
-        for (const child of node.elseChildren) {
-          output += renderNodeSync(child, data, options, ctx)
-        }
-        return output
-      }
-      return ''
-    }
-
-    case 'Unless': {
-      const value = getConditionValue(node, data, ctx.index, ctx.key)
-      if (!value) {
-        let output = ''
-        for (const child of node.children) {
-          output += renderNodeSync(child, data, options, ctx)
-        }
-        return output
-      }
-      return ''
-    }
-
-    case 'Partial':
-      throw new Error('Partials require partialsDir option')
-
-    case 'Layout':
-      throw new Error('Layouts require partialsDir option')
-  }
 }
 
 async function renderAsync(ast: ASTNode[], data: unknown, options: RenderOptions): Promise<string> {

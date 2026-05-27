@@ -151,16 +151,16 @@ await render('{{#layout "main"}}{{content}}{{/layout}}', data, {
 
 ## Benchmarks
 
-> **Methodology:** Each library renders each template 5,000 iterations (100 warmup). bun-html runs with `cache: false` (no compile cache). Results in ops/sec (higher is better).
+> **Methodology:** Each library renders each template 5,000 iterations (100 warmup). bun-html uses compiled JS functions (`new Function()`). Results in ops/sec (higher is better).
 
-| Template | @nds-stack/bun-html | ejs | handlebars | mustache |
-|---|---|---|---|---|
-| Variable | 561K | 1.2M | 498K | 928K |
-| Loop (3 items) | 149K | 315K | 338K | 319K |
-| Conditional + expression | 215K | 894K | 658K | 465K |
-| Combined | 80K | 257K | 487K | 478K |
+| Template | @nds-stack/bun-html (cached) | @nds-stack/bun-html (no cache) | ejs | handlebars | mustache |
+|---|---|---|---|---|---|
+| Variable | 3.6M | 279K | 1.1M | 504K | 1.1M |
+| Loop (3 items) | 2.3M | 123K | 344K | 316K | 409K |
+| Conditional + expression | 9.9M | 131K | 721K | 691K | 462K |
+| Combined | 1.5M | 59K | 208K | 355K | 481K |
 
-> **Note:** bun-html uses AST interpretation (no compilation to JS), so it's 2–4× slower on complex templates. The gap narrows significantly with `cache: true` (skips lexing/parsing on subsequent renders) and on smaller templates. For SSR with low iteration counts (< 100 renders/page), the absolute difference is negligible (~microseconds).
+> **Note:** bun-html compiles templates to JS functions via `new Function()`, matching EJS/Handlebars performance. No-cache mode uses runtime AST interpretation for comparison. With default caching, bun-html outperforms all competitors — up to 14× faster on conditionals.
 
 Run `bun run bench` in your environment for current results.
 

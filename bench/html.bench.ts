@@ -61,7 +61,10 @@ async function main() {
   for (const tpl of templates) {
     const row: Record<string, number> = {}
 
-    row['bun'] = await bench(() => render(tpl.bun, data, { cache: false }))
+    // Warmup cache separately
+    render(tpl.bun, data)
+    row['bun-nocache'] = await bench(() => render(tpl.bun, data, { cache: false }))
+    row['bun-cached'] = await bench(() => render(tpl.bun, data))
 
     if (ejsMod) {
       const fn = ejsMod.compile(tpl.ejs)
@@ -79,13 +82,15 @@ async function main() {
   }
 
   console.log(`\nBenchmark: HTML template rendering (ops/sec, higher is better)\n`)
-  console.log(`Template | @nds-stack/bun-html | ejs | handlebars | mustache |`)
-  console.log(`---------|-------------------|------|------------|----------|`)
+
+  const headers = ['Template', '@nds-stack/bun-html (cached)', '@nds-stack/bun-html (no cache)', 'ejs', 'handlebars', 'mustache']
+  console.log(`| ${headers.join(' | ')} |`)
+  console.log(`|${headers.map(() => '---').join('|')}|`)
 
   for (const tpl of templates) {
     const r = results[tpl.name]!
     console.log(
-      `${tpl.name} | ${format(r.bun ?? 0)} | ${format(r.ejs ?? 0)} | ${format(r.hbs ?? 0)} | ${format(r.mustache ?? 0)} |`,
+      `| ${tpl.name} | ${format(r['bun-cached'] ?? 0)} | ${format(r['bun-nocache'] ?? 0)} | ${format(r.ejs ?? 0)} | ${format(r.hbs ?? 0)} | ${format(r.mustache ?? 0)} |`,
     )
   }
   console.log()
