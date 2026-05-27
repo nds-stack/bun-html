@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.1.0-alpha.8] — 2026-05-27
+
+### Added
+- Security hardening: prototype pollution guard (`validateKey`) blocks `__proto__`, `constructor`, `prototype`, `eval`, `Function`, etc.
+- Error diagnostics: line/column tracking in lexer + parser — all errors include `at line X, column Y`
+- Recursive partial depth limit (max 50) to prevent infinite loops
+- Refactored into 13 small files (<211 lines each) — `cache.ts`, `evaluator.ts`, `runtime.ts`
+- Examples enriched to 15 varied use cases (expressions, plugins, streaming, adapters)
+- Tests: 77 (4 new: security + cache management)
+
+### Fixed
+- Cache key whitespace sensitivity documented in README
+- `UnaryMinus` on `undefined`/`null` now returns 0 instead of NaN
+- Exhaustive switch `default: never` in evaluator for compile-time safety
+- Empty parent path `../` no longer adds empty path segments
+- Dead code `formatPosition` removed from `types.ts`
+- String tokenizer now throws on unterminated string literals
+- `validatePartialName` now rejects empty names
+- `purgeTemplate` correctly returns result from both template and compiled caches
+
+### Changed
+- `renderer.ts` (364 lines) split into `cache.ts`, `runtime.ts`, `renderer.ts` (119 lines)
+- `expression.ts` (364 lines) split — evaluator moved to `evaluator.ts` (93 lines)
+
 ## [0.1.0-alpha.7] — 2026-05-27
 
 ### Added
