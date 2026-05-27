@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.1.0-alpha.9] — 2026-05-28
+
+### Added
+- Expression: nullish coalescing operator (`??`) — `{{name ?? "default"}}`
+- Expression: array literals (`[1, 2, 3]`) and object literals (`{key: val}`)
+- Pipe/filter syntax: `{{name | uppercase | truncate:10}}` with chaining and arguments
+- Source maps for compiled templates (`__sourceMap` on `compileToFunction()` result)
+- `BoundedCache` TTL support — constructor `(max, defaultTtl)`, per-entry `set(key, val, ttl)`
+- `BoundedCache` memory estimation + stats: `hits`, `misses`, `evictions`, `memoryBytes`, `memoryMB`
+- `BoundedCache.purge()` — removes all expired entries
+- `getCacheStats()` — exposes template + compiled cache stats
+- `clearPartials()` — now exported to public API
+
+### Changed
+- Shared evaluator core: all AST nodes (`Variable`, `RawVariable`, `Each`, `With`, `If`, `Unless`) now carry `exprAst` — both sync (compiled) and async (AST walker) paths use `evaluateExpr`
+- Async path now correctly handles expressions (function calls, arithmetic, ternary, `??`, literals) — previously expressions were only available in compiled mode
+- `render()` signature unchanged but internal path resolution deduplicated via shared `tryParseExpression`
+- `BoundedCache` constructor now guards max ≥ 1 (was unbounded negative possible)
+
+### Fixed
+- Pipe filter `this` binding: compiled filters now receive the value as `this` (was incorrectly passing `__d` data object)
+- `PipeFilter` interface properly exported from `types.ts`
+- Redundant `compile` import removed from source map test
+- CHANGELOG.md now excluded from `.gitignore` (was accidentally getting ignored)
+
+### Security
+- `validateKey` guard unchanged from alpha.8 — all `??`, `[]` , `{}` literals pass through the same expression evaluator with full prototype pollution protection
+
 ## [0.1.0-alpha.8] — 2026-05-27
 
 ### Added
