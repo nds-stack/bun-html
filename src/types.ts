@@ -6,7 +6,10 @@ export type ExprNode =
   | { type: 'Null' }
   | { type: 'Undefined' }
   | { type: 'UnaryNot'; operand: ExprNode }
-  | { type: 'BinaryOp'; op: '&&' | '||' | '>' | '<' | '>=' | '<=' | '==' | '!='; left: ExprNode; right: ExprNode }
+  | { type: 'UnaryMinus'; operand: ExprNode }
+  | { type: 'BinaryOp'; op: '&&' | '||' | '>' | '<' | '>=' | '<=' | '==' | '!=' | '+' | '-' | '*' | '/'; left: ExprNode; right: ExprNode }
+  | { type: 'CallExpression'; callee: ExprNode; args: ExprNode[] }
+  | { type: 'Ternary'; condition: ExprNode; then: ExprNode; else: ExprNode }
 
 export interface Token {
   type: 'Text' | 'Variable' | 'RawVariable' | 'EachOpen' | 'EachClose' | 'IfOpen' | 'IfClose' | 'Else' | 'UnlessOpen' | 'UnlessClose' | 'WithOpen' | 'WithClose' | 'DefOpen' | 'DefClose' | 'Partial' | 'LayoutOpen' | 'LayoutClose'

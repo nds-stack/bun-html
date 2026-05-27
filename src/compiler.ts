@@ -1,4 +1,5 @@
 import type { ASTNode, ExprNode, CompiledTemplate } from './types.js'
+import { parseExpression } from './expression.js'
 
 export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   const body: string[] = []
@@ -100,9 +101,15 @@ function genNode(node: ASTNode, body: string[]): void {
 }
 
 function genVariable(expression: string, escape: boolean, body: string[]): void {
-  const path = genSafePath(expression)
+  let exprCode: string
+  try {
+    const exprAst = parseExpression(expression)
+    exprCode = genExpr(exprAst)
+  } catch {
+    exprCode = genSafePath(expression)
+  }
   body.push(`{`)
-  body.push(`let _v = ${path}`)
+  body.push(`let _v = ${exprCode}`)
   body.push(`if (_v === void 0) {`)
   body.push(`let _hf = __h[${JSON.stringify(expression)}]`)
   body.push(`if (typeof _hf === 'function') _v = _hf.call(__d)`)
@@ -208,7 +215,19 @@ function genExpr(expr: ExprNode): string {
     }
     case 'UnaryNot':
       return `(!${genExpr(expr.operand)})`
+    case 'UnaryMinus':
+      return `(-(${genExpr(expr.operand)}))`
     case 'BinaryOp':
       return `(${genExpr(expr.left)} ${expr.op} ${genExpr(expr.right)})`
+    case 'CallExpression': {
+      const callee = genExpr(expr.callee)
+      const args = expr.args.map(a => genExpr(a)).join(', ')
+      if (expr.callee.type === 'Identifier') {
+        return `${callee}?.(${args})`
+      }
+      return `${callee}?.(${args})`
+    }
+    case 'Ternary':
+      return `(${genExpr(expr.condition)} ? ${genExpr(expr.then)} : ${genExpr(expr.else)})`
   }
 }

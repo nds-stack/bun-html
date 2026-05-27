@@ -89,6 +89,16 @@ See [Framework Adapters](#framework-adapters) for full usage.
 
 Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
 
+**Variable expressions:** `{{var}}` supports full expressions — not just path resolution:
+| Expression | Example |
+|------------|---------|
+| Function calls | `{{name.toUpperCase()}}`, `{{user.getName()}}` |
+| Arithmetic | `{{count + 1}}`, `{{price * (1 + tax)}}` |
+| Ternary | `{{age >= 18 ? "adult" : "minor"}}` |
+| Unary minus | `{{-balance}}` |
+
+> Note: Chained calls after `()` (e.g., `.trim()` after `.toUpperCase()`) are not yet supported.
+
 **Loop context:** Inside `{{#each}}`, the following variables are available:
 | Variable | Description |
 |----------|-------------|

@@ -2,9 +2,11 @@ import type { ExprNode } from './types.js'
 
 export type ExprTokenType =
   | 'Identifier' | 'Number' | 'String' | 'Boolean' | 'Null' | 'Undefined'
-  | 'ParenOpen' | 'ParenClose'
+  | 'ParenOpen' | 'ParenClose' | 'Comma'
   | 'Not' | 'And' | 'Or'
+  | 'Plus' | 'Minus' | 'Star' | 'Slash'
   | 'Gt' | 'Lt' | 'Gte' | 'Lte' | 'Eq' | 'Neq'
+  | 'Question' | 'Colon'
 
 export interface ExprToken {
   type: ExprTokenType
@@ -50,8 +52,9 @@ export function tokenizeExpr(input: string): ExprToken[] {
 
     if (input[i] === '.' && i + 2 < input.length && input[i + 1] === '.' && input[i + 2] === '/') {
       let j = i + 3
-      while (j < input.length && /[a-zA-Z0-9_$.]/.test(input[j]!)) j++
-      tokens.push({ type: 'Identifier', value: input.slice(i, j) })
+      while (j < input.length && /[a-zA-Z0-9_$./]/.test(input[j]!)) j++
+      const word = input.slice(i, j)
+      tokens.push({ type: 'Identifier', value: word })
       i = j
       continue
     }
@@ -66,9 +69,16 @@ export function tokenizeExpr(input: string): ExprToken[] {
 
     if (input[i] === '(') { tokens.push({ type: 'ParenOpen' }); i++; continue }
     if (input[i] === ')') { tokens.push({ type: 'ParenClose' }); i++; continue }
+    if (input[i] === ',') { tokens.push({ type: 'Comma' }); i++; continue }
     if (input[i] === '>') { tokens.push({ type: 'Gt' }); i++; continue }
     if (input[i] === '<') { tokens.push({ type: 'Lt' }); i++; continue }
     if (input[i] === '!') { tokens.push({ type: 'Not' }); i++; continue }
+    if (input[i] === '+') { tokens.push({ type: 'Plus' }); i++; continue }
+    if (input[i] === '-') { tokens.push({ type: 'Minus' }); i++; continue }
+    if (input[i] === '*') { tokens.push({ type: 'Star' }); i++; continue }
+    if (input[i] === '/') { tokens.push({ type: 'Slash' }); i++; continue }
+    if (input[i] === '?') { tokens.push({ type: 'Question' }); i++; continue }
+    if (input[i] === ':') { tokens.push({ type: 'Colon' }); i++; continue }
 
     throw new Error(`Unexpected character '${input[i]}' in expression`)
   }
@@ -100,7 +110,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     switch (token.type) {
       case 'Number':
         consume()
-        return { type: 'Number', value: parseFloat(token.value!) }
+        return { type: 'Number', value: Number(token.value!) }
       case 'String':
         consume()
         return { type: 'String', value: token.value! }
@@ -129,7 +139,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
       }
       case 'ParenOpen':
         consume()
-        const expr = parseOr()
+        const expr = parseExpr()
         consume('ParenClose')
         return expr
       default:
@@ -137,16 +147,60 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     }
   }
 
-  function parseNot(): ExprNode {
+  function parseCall(): ExprNode {
+    let node = parsePrimary()
+    while (peek()?.type === 'ParenOpen') {
+      consume()
+      const args: ExprNode[] = []
+      if (peek()?.type !== 'ParenClose') {
+        args.push(parseExpr())
+        while (peek()?.type === 'Comma') {
+          consume('Comma')
+          args.push(parseExpr())
+        }
+      }
+      consume('ParenClose')
+      node = { type: 'CallExpression', callee: node, args }
+    }
+    return node
+  }
+
+  function parseUnary(): ExprNode {
     if (peek()?.type === 'Not') {
       consume()
-      return { type: 'UnaryNot', operand: parseNot() }
+      return { type: 'UnaryNot', operand: parseUnary() }
     }
-    return parsePrimary()
+    if (peek()?.type === 'Minus') {
+      consume()
+      return { type: 'UnaryMinus', operand: parseUnary() }
+    }
+    return parseCall()
+  }
+
+  function parseMultiplicative(): ExprNode {
+    let left = parseUnary()
+    while (peek()?.type === 'Star' || peek()?.type === 'Slash') {
+      const token = consume()
+      const op = token.type === 'Star' ? '*' : '/'
+      const right = parseUnary()
+      left = { type: 'BinaryOp', op, left, right }
+    }
+    return left
+  }
+
+  function parseAdditive(): ExprNode {
+    let left = parseMultiplicative()
+    while (peek()?.type === 'Plus' || peek()?.type === 'Minus') {
+      const token = consume()
+      const op = token.type === 'Plus' ? '+' : '-'
+      const right = parseMultiplicative()
+      left = { type: 'BinaryOp', op, left, right }
+    }
+    return left
   }
 
   function parseComparison(): ExprNode {
-    let left = parseNot()
+    let left = parseAdditive()
     const token = peek()
     if (token && ['Gt', 'Lt', 'Gte', 'Lte', 'Eq', 'Neq'].includes(token.type)) {
       consume()
@@ -154,7 +208,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
         Gt: '>', Lt: '<', Gte: '>=', Lte: '<=', Eq: '==', Neq: '!=',
       }
       const op = opMap[token.type]!
-      const right = parseNot()
+      const right = parseAdditive()
       left = { type: 'BinaryOp', op, left, right }
     }
     return left
@@ -180,7 +234,23 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     return left
   }
 
-  const result = parseOr()
+  function parseTernary(): ExprNode {
+    const condition = parseOr()
+    if (peek()?.type === 'Question') {
+      consume('Question')
+      const then = parseExpr()
+      consume('Colon')
+      const el = parseExpr()
+      return { type: 'Ternary', condition, then, else: el }
+    }
+    return condition
+  }
+
+  function parseExpr(): ExprNode {
+    return parseTernary()
+  }
+
+  const result = parseExpr()
   if (pos < tokens.length) {
     throw new Error(`Unexpected token after expression: ${tokens[pos]!.type}`)
   }
@@ -238,6 +308,10 @@ export function evaluateExpr(
     case 'UnaryNot': {
       return !evaluateExpr(node.operand, data, index, key, stack)
     }
+    case 'UnaryMinus': {
+      const val = evaluateExpr(node.operand, data, index, key, stack)
+      return -Number(val)
+    }
     case 'BinaryOp': {
       if (node.op === '&&') {
         const left = evaluateExpr(node.left, data, index, key, stack)
@@ -258,7 +332,21 @@ export function evaluateExpr(
         case '<=': return Number(left) <= Number(right)
         case '==': return left == right
         case '!=': return left != right
+        case '+': return Number(left) + Number(right)
+        case '-': return Number(left) - Number(right)
+        case '*': return Number(left) * Number(right)
+        case '/': return Number(left) / Number(right)
       }
+    }
+    case 'CallExpression': {
+      const callee = evaluateExpr(node.callee, data, index, key, stack)
+      if (typeof callee !== 'function') return undefined
+      const args = node.args.map(a => evaluateExpr(a, data, index, key, stack))
+      return callee.apply(null, args)
+    }
+    case 'Ternary': {
+      const cond = evaluateExpr(node.condition, data, index, key, stack)
+      return cond ? evaluateExpr(node.then, data, index, key, stack) : evaluateExpr(node.else, data, index, key, stack)
     }
   }
 }

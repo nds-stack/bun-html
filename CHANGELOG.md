@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.4] — 2026-05-27
+
+### Added
+- Variable interpolation expressions — function calls (`{{name.toUpperCase()}}`), arithmetic (`{{count + 1}}`), ternary (`{{age >= 18 ? "adult" : "minor"}}`)
+- Full operator precedence: `!`, `-` (unary), `*`, `/`, `+`, `-`, comparison, `&&`, `||`, ternary
+- Expression support in `{{var}}` and `{{{var}}}` (previously only in `{{#if}}`)
+
 ## [0.1.0-alpha.3] — 2026-05-27
 
 ### Added

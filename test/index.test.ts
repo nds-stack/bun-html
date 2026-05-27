@@ -338,4 +338,44 @@ describe('bun-html', () => {
     expect(() => render('{{> missing}}', {})).toThrow()
   })
 
+  test('variable expression: function call {{name.toUpperCase()}}', () => {
+    const result = render('{{name.toUpperCase()}}', { name: 'hello' })
+    expect(result).toBe('HELLO')
+  })
+
+  test('variable expression: arithmetic {{count + 1}}', () => {
+    const result = render('{{count + 1}}', { count: 5 })
+    expect(result).toBe('6')
+  })
+
+  test('variable expression: ternary {{age >= 18 ? "adult" : "minor"}}', () => {
+    expect(render('{{age >= 18 ? "adult" : "minor"}}', { age: 20 })).toBe('adult')
+    expect(render('{{age >= 18 ? "adult" : "minor"}}', { age: 15 })).toBe('minor')
+  })
+
+  test('variable expression: nested function call on object', () => {
+    const result = render('{{user.name.toUpperCase()}}', { user: { name: 'alice' } })
+    expect(result).toBe('ALICE')
+  })
+
+  test('variable expression: multiple arithmetic', () => {
+    const result = render('{{a + b * c}}', { a: 1, b: 2, c: 3 })
+    expect(result).toBe('7')  // 1 + (2*3) = 7
+  })
+
+  test('variable expression: subtraction and division', () => {
+    const result = render('{{a - b / c}}', { a: 10, b: 6, c: 3 })
+    expect(result).toBe('8')  // 10 - (6/3) = 8
+  })
+
+  test('variable expression: unary minus', () => {
+    const result = render('{{-a}}', { a: 5 })
+    expect(result).toBe('-5')
+  })
+
+  test('variable expression: function method chaining', () => {
+    const result = render('{{greeting.toUpperCase()}}', { greeting: ' hello ' })
+    expect(result).toBe(' HELLO ')
+  })
+
 })
