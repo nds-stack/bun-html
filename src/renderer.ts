@@ -52,6 +52,7 @@ export function render(
   data: Record<string, unknown>,
   options?: RenderOptions,
 ): string | Promise<string> {
+  if (template.length > MAX_TEMPLATE_LENGTH) throw new Error(`Template exceeds maximum length of ${MAX_TEMPLATE_LENGTH}`)
   let opts: RenderOptions = options ?? {}
 
   const plugins = opts.plugins ?? []

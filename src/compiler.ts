@@ -1,6 +1,8 @@
 import type { ASTNode, ASTNodeVariable, ASTNodeRawVariable, ExprNode, CompiledTemplate, PipeFilter } from './types.js'
 import { validateKey } from './types.js'
 import { parseExpression } from './expression.js'
+import { writeFileSync, mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 
 export interface SourceMapEntry {
   generatedLine: number
@@ -27,6 +29,36 @@ export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   const fn = new Function('data', 'helpers', 'escapeHTML', code) as CompiledTemplate
   ;(fn as unknown as Record<string, unknown>).__sourceMap = sourceMap
   return fn
+}
+
+export function compileToString(ast: ASTNode[]): string {
+  const body: string[] = []
+  const sourceMap: SourceMapEntry[] = []
+
+  body.push('\'use strict\'')
+  body.push('let $ = ""')
+  body.push('let __d = data')
+  body.push('let __h = helpers || {}')
+  body.push('let __s = []')
+  body.push('let __defs = {}')
+  body.push('let __depth = 0')
+
+  genNodes(ast, body, sourceMap)
+
+  body.push('return $')
+
+  return body.join('\n')
+}
+
+export function compileToFile(ast: ASTNode[], outputPath: string): void {
+  const code = compileToString(ast)
+  const wrapped = `// Precompiled by @nds-stack/bun-html
+export default function(data, helpers, escapeHTML) {
+${code}
+}
+`
+  mkdirSync(dirname(outputPath), { recursive: true })
+  writeFileSync(outputPath, wrapped)
 }
 
 function genNodes(nodes: ASTNode[], body: string[], sourceMap: SourceMapEntry[]): void {

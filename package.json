@@ -5,6 +5,9 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "bin": {
+    "bun-html": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
@@ -16,7 +19,8 @@
   ],
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target bun --format esm && tsc -p tsconfig.build.json",
+    "build:cli": "bun build ./src/cli.ts --outdir ./dist --target bun --format esm",
+    "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target bun --format esm && bun run build:cli && tsc -p tsconfig.build.json",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "bench": "bun bench/html.bench.ts"
@@ -24,10 +28,13 @@
   "devDependencies": {
     "@types/ejs": "^3.1.5",
     "@types/mustache": "^4.2.6",
+    "@types/nunjucks": "^3.2.6",
     "bun-types": "latest",
     "ejs": "^3.1.10",
+    "eta": "^4.6.0",
     "handlebars": "^4.7.8",
     "mustache": "^4.2.0",
+    "nunjucks": "^3.2.4",
     "typescript": "^6.0.3"
   },
   "repository": {

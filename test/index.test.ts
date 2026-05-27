@@ -677,4 +677,184 @@ describe('bun-html', () => {
     clearCache()
   })
 
+  test('precompile: compileToString generates valid JS', () => {
+    const { compile, compileToString } = require('../src/index.js')
+    const ast = compile('Hello {{name}}!')
+    const code = compileToString(ast)
+    expect(typeof code).toBe('string')
+    expect(code).toContain('__d')
+    expect(code).toContain('return $')
+  })
+
+  test('precompile: compileToFile writes valid JS module', () => {
+    const { compile, compileToFile } = require('../src/index.js')
+    const { mkdtempSync } = require('node:fs')
+    const { join } = require('node:path')
+    const ast = compile('<h1>{{title}}</h1>')
+    const tmp = mkdtempSync('bun-html-test-')
+    const outFile = join(tmp, 'page.html.js')
+    compileToFile(ast, outFile)
+    const content = require('node:fs').readFileSync(outFile, 'utf-8')
+    expect(content).toContain('export default function')
+    expect(content).toContain('__d')
+    require('node:fs').rmSync(tmp, { recursive: true, force: true })
+  })
+
+  test('precompile: compileToFile output is importable and renderable', async () => {
+    const { compile, compileToFile } = require('../src/index.js')
+    const { mkdtempSync } = require('node:fs')
+    const { join } = require('node:path')
+    const { pathToFileURL } = require('node:url')
+    const ast = compile('{{greeting}}, {{name}}!')
+    const tmp = mkdtempSync('bun-html-test-')
+    const outFile = join(tmp, 'greet.js')
+    compileToFile(ast, outFile)
+
+    const mod = await import(pathToFileURL(outFile).href)
+    const output = mod.default({ greeting: 'Hi', name: 'Bun' }, {}, (s: string) => s)
+    expect(output).toBe('Hi, Bun!')
+
+    require('node:fs').rmSync(tmp, { recursive: true, force: true })
+  })
+
+  test('precompile: precompile() scans dir and generates barrel', () => {
+    const { precompile } = require('../src/index.js')
+    const { mkdtempSync } = require('node:fs')
+    const { join } = require('node:path')
+    const tmp = mkdtempSync('bun-html-test-')
+    const viewsDir = join(tmp, 'views')
+
+    const viewsSub = join(viewsDir, 'partial')
+    require('node:fs').mkdirSync(viewsSub, { recursive: true })
+    require('node:fs').writeFileSync(join(viewsDir, 'home.html'), '<h1>{{name}}</h1>')
+    require('node:fs').writeFileSync(join(viewsSub, 'card.html'), '<span>{{text}}</span>')
+
+    const outDir = join(tmp, 'out')
+    const result = precompile(viewsDir, outDir)
+    expect(result.files).toBe(2)
+    expect(result.output).toBe(outDir)
+
+    const barrelContent = require('node:fs').readFileSync(join(outDir, 'index.js'), 'utf-8')
+    expect(barrelContent).toContain('import home_html')
+    expect(barrelContent).toContain('import partial_card_html')
+
+    require('node:fs').rmSync(tmp, { recursive: true, force: true })
+  })
+
+  test('fuzz: deeply nested #if does not crash (50 levels)', () => {
+    let tpl = '{{name}}'
+    for (let i = 0; i < 50; i++) {
+      tpl = `{{#if name}}${tpl}{{/if}}`
+    }
+    expect(() => render(tpl, { name: 'test' })).not.toThrow()
+  })
+
+  test('fuzz: deeply nested #each does not crash', () => {
+    let tpl = '{{this}}'
+    for (let i = 0; i < 20; i++) {
+      tpl = `{{#each items}}${tpl}{{/each}}`
+    }
+    const data: any = { items: [{ items: [{ items: [] }] }] }
+    expect(() => render(tpl, data)).not.toThrow()
+  })
+
+  test('fuzz: deeply nested #with does not crash', () => {
+    let tpl = '{{name}}'
+    for (let i = 0; i < 20; i++) {
+      tpl = `{{#with obj}}${tpl}{{/with}}`
+    }
+    const data: any = { obj: { obj: { obj: { obj: { obj: { name: 'x' } } } } } }
+    expect(() => render(tpl, data)).not.toThrow()
+  })
+
+  test('fuzz: unclosed #each throws with position', () => {
+    expect(() => render('{{#each items}}oops', { items: [] })).toThrow('Unclosed {{#each}}')
+  })
+
+  test('fuzz: unclosed #if throws with position', () => {
+    expect(() => render('{{#if x}}oops', { x: true })).toThrow('Unclosed {{#if}}')
+  })
+
+  test('fuzz: malformed expression resolves gracefully as variable name', () => {
+    expect(() => render('{{name.}}', { name: 'test' })).not.toThrow()
+    expect(render('{{name.}}', { name: 'test' })).toBe('')
+  })
+
+  test('fuzz: unterminated string falls back to property lookup', () => {
+    expect(() => render('{{ x == "unclosed }}', {})).not.toThrow()
+  })
+
+  test('fuzz: large template (10K chars) does not crash', () => {
+    const line = '<li>item</li>\n'
+    const tpl = `<ul>${line.repeat(300)}</ul>`  // ~9.8K
+    const result = render(tpl, {})
+    expect(result).toContain('<ul>')
+    expect(result).toContain('</ul>')
+  })
+
+  test('fuzz: template max length enforced via render()', () => {
+    const huge = 'x'.repeat(1_000_001)
+    expect(() => render(huge, {})).toThrow('Template exceeds maximum length')
+  })
+
+  test('fuzz: unicode and emoji handled correctly', () => {
+    expect(render('{{smile}} world', { smile: '😀' })).toBe('😀 world')
+    const result = render('{{#each items}}{{this}},{{/each}}', {
+      items: ['café', 'naïve', '東京'],
+    })
+    expect(result).toBe('café,naïve,東京,')
+  })
+
+  test('fuzz: script tag auto-escaped', () => {
+    const result = render('<div>{{content}}</div>', { content: '<script>alert(1)</script>' })
+    expect(result).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+    expect(result).not.toContain('<script>')
+  })
+
+  test('fuzz: HTML entities preserved', () => {
+    const result = render('{{text}}', { text: '&amp; &lt; &gt;' })
+    expect(result).toBe('&amp;amp; &amp;lt; &amp;gt;')
+  })
+
+  test('fuzz: inline partial recursive depth caught', () => {
+    expect(() => {
+      render('{{#def "loop"}}{{#if true}}{{> loop}}{{/if}}{{/def}}{{> loop}}', {})
+    }).toThrow('Partial recursion too deep')
+  })
+
+  test('fuzz: empty template renders nothing', () => {
+    expect(render('', {})).toBe('')
+    expect(render('   ', {})).toBe('   ')
+  })
+
+  test('fuzz: null/undefined data does not crash', () => {
+    expect(() => render('{{name}}', null as any)).not.toThrow()
+    expect(() => render('{{name}}', undefined as any)).not.toThrow()
+  })
+
+  test('fuzz: prototype pollution blocked via validateKey', () => {
+    expect(() => render('{{__proto__}}', {})).toThrow('not allowed')
+    expect(() => render('{{constructor}}', {})).toThrow('not allowed')
+    expect(() => render('{{#each constructor}}x{{/each}}', {})).toThrow('not allowed')
+  })
+
+  test('fuzz: whitespace control strips adjacent whitespace', () => {
+    expect(render('{{~name~}}', { name: 'x' })).toBe('x')
+    expect(render('a{{~name~}}b', { name: 'x' })).toBe('axb')
+    expect(render('a {{~name~}} b', { name: 'x' })).toBe('axb')
+  })
+
+  test('fuzz: cache TTL eviction works under load', () => {
+    const { BoundedCache } = require('../src/index.js')
+    const cache = new BoundedCache(3, 10)
+    cache.set('a', 1)
+    cache.set('b', 2)
+    cache.set('c', 3)
+    cache.set('d', 4)
+    expect(cache.size).toBeLessThanOrEqual(3)
+    Bun.sleepSync(20)
+    cache.purge()
+    expect(cache.size).toBe(0)
+  })
+
 })

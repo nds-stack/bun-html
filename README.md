@@ -326,39 +326,52 @@ app.get('/', (c) => {
 
 ## Comparison Table
 
-| Feature | bun-html | mustache | handlebars | ejs |
-|---------|----------|----------|------------|-----|
-| Zero dependencies | ✅ | ❌ | ❌ | ❌ |
-| Bun-native (Bun.escapeHTML, Bun.file) | ✅ | ❌ | ❌ | ❌ |
-| Async partials | ✅ | ❌ | ❌ | ❌ |
-| Layouts | ✅ | ❌ | ❌ | ❌ |
-| Scoped context (`#with`) | ✅ | ✅ | ✅ | ✅ |
-| Parent context (`../var`) | ✅ | ✅ | ✅ | ✅ |
-| Comments | ✅ | ✅ | ❌ | ✅ |
-| Auto-escape | ✅ default | ✅ default | ✅ default | ❌ |
-| Raw output (`{{{}}}`) | ✅ | ✅ | ✅ | N/A |
-| Loops | ✅ | ✅ | ✅ | ✅ |
-| Conditionals | ✅ | ❌ | ✅ | ✅ |
-| Helpers | ✅ | ❌ | ✅ | ✅ |
-| Template caching | ✅ | ❌ | ✅ | ✅ |
-| Whitespace control | ✅ | ❌ | ✅ | ✅ |
-| Inline partials (`#def`) | ✅ | ❌ | ✅ | ❌ |
-| Plugin system | ✅ | ❌ | ❌ | ❌ |
-| Stream rendering | ✅ | ❌ | ❌ | ❌ |
-| Expressions | ✅ | ❌ | ❌ | ✅ |
+| Feature | bun-html | mustache | handlebars | ejs | nunjucks |
+|---------|----------|----------|------------|-----|----------|
+| Zero dependencies | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Bun-native | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Async partials | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Layouts | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Scoped context (`#with`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Parent context (`../var`) | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Comments | ✅ | ✅ | ❌ | ✅ | ✅ |
+| Auto-escape | ✅ default | ✅ default | ✅ default | ❌ | ✅ |
+| Raw output | ✅ | ✅ | ✅ | N/A | ✅ |
+| Loops | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Conditionals | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Helpers | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Template caching | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Whitespace control | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Inline partials | ✅ | ❌ | ✅ | ❌ | ✅ |
+| Plugin system | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Stream rendering | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Expressions (??, ternary, etc.) | ✅ | ❌ | ❌ | ✅ | ✅ |
+| Pipe/filter syntax | ✅ | ❌ | ❌ | ❌ | ✅ |
+| Precompile CLI | ✅ | ❌ | ✅ | ✅ | ✅ |
+| Source maps | ✅ | ❌ | ❌ | ❌ | ❌ |
 
 ## Benchmarks
 
-> **Methodology:** Each library renders each template 5,000 iterations (100 warmup) using their **default rendering mode**. ejs and Handlebars pre-compile via `.compile()`. bun-html caches compiled JS functions (`new Function()`) by default. Mustache re-parses every call (no compilation). Benchmark auto-stops if 1,000 iterations exceed 10 seconds. Results in ops/sec (higher is better). Run on Bun 1.3.14, Windows 11, Intel i7-13700H.
+> **Methodology:** Each library renders each template 5,000 iterations (100 warmup) using their **default rendering mode**. ejs and Handlebars pre-compile via `.compile()`. bun-html caches compiled JS functions (`new Function()`) by default. Mustache and Nunjucks re-parse every call. Benchmark auto-stops if 1,000 iterations exceed 10 seconds. Memory measured via `process.memoryUsage().heapUsed` delta. Startup time measures first (cold) vs second (warm) render on Combined template. Results in ops/sec (higher is better). Run on Bun 1.3.14, Windows 11, Intel i7-13700H.
 
-| Template | @nds-stack/bun-html | ejs | handlebars | mustache |
-|---|---|---|---|---|
-| Variable | 995K | 1.0M | 456K | 639K |
-| Loop (3 items) | 688K | 324K | 268K | 403K |
-| Conditional + expression | 1.9M | 1.1M | 458K | 1.2M |
-| Combined | 823K | 275K | 283K | 675K |
+| Template | @nds-stack/bun-html | ejs | handlebars | mustache | nunjucks |
+|---|---|---|---|---|---|
+| Variable | 1.1M | 1.1M | 325K | 977K | 30K |
+| Loop (3 items) | 704K | 199K | 189K | 294K | 11K |
+| Conditional + expression | 764K | 846K | 400K | 551K | 17K |
+| Combined | 460K | 158K | 192K | 332K | 8K |
 
-> **All libraries are on equal footing:** ejs and Handlebars also compile to JS functions — bun-html competes head-to-head with ejs on Variable, wins on Loop (+112%) and Combined (+199%). Both leverage `new Function()` + `Bun.escapeHTML()`. Handlebars and Mustache are slower due to heavier runtime overhead and re-parsing (Mustache).
+### Startup time (Combined template, ms)
+
+| Library | Cold | Warm |
+|---|---|---|
+| @nds-stack/bun-html | 0.03 | 0.12 |
+| ejs | 0.30 | 0.16 |
+| handlebars | 1.45 | 1.31 |
+| mustache | 0.02 | 0.01 |
+| nunjucks | 0.26 | 0.16 |
+
+> **All libraries are on equal footing:** ejs, Handlebars, and bun-html all leverage `new Function()` compilation. bun-html leads on Loop (+254% vs ejs) and Combined (+191% vs ejs). Mustache is competitive on Variable but has no compilation step. Nunjucks is a full-featured engine with autoescape + async by default — slower but more capable. Memory usage for all libraries is sub-MB at this template size.
 
 ## Real-World Example
 
