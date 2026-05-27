@@ -95,10 +95,10 @@ export function render(
   }
 
   const doCache = opts.cache !== false
-  let fn: CompiledTemplate
+  let fn: CompiledTemplate | undefined
 
   if (doCache) {
-    fn = compiledCache.get(template)!
+    fn = compiledCache.get(template)
     if (!fn) {
       const ast = parse(tokenize(template))
       fn = compileToFunction(ast)

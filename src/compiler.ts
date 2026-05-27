@@ -1,10 +1,4 @@
-import type { ASTNode, ExprNode } from './types.js'
-
-export type CompiledTemplate = (
-  data: unknown,
-  helpers: Record<string, (this: unknown, ...args: unknown[]) => unknown> | undefined,
-  escapeHTML: (s: string) => string,
-) => string
+import type { ASTNode, ExprNode, CompiledTemplate } from './types.js'
 
 export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   const body: string[] = []

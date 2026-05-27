@@ -43,12 +43,13 @@ async function bench(fn: () => string | Promise<string>, iterations = 5000): Pro
   for (let i = 0; i < 100; i++) fn()
 
   const start = performance.now()
-  for (let i = 0; i < iterations; i++) {
+  let i: number
+  for (i = 0; i < iterations; i++) {
     if (i === 1000 && performance.now() - start > 10000) break
     fn()
   }
   const elapsed = performance.now() - start
-  return Math.round(iterations / (elapsed / 1000))
+  return Math.round(i / (elapsed / 1000))
 }
 
 async function main() {
