@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.0-alpha.11] — 2026-05-28
+
+### Fixed
+- CLI binary entry now includes shebang (`#!/usr/bin/env bun`) — `bun-html` command works after `npm install`
+
 ## [0.1.0-alpha.10] — 2026-05-28
 
 ### Added
