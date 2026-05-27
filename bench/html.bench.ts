@@ -62,20 +62,22 @@ async function main() {
   for (const tpl of templates) {
     const row: Record<string, number> = {}
 
-    // Warmup cache separately
+    // bun-html default mode (cache: true) — compile once via new Function()
     render(tpl.bun, data)
-    row['bun-nocache'] = await bench(() => render(tpl.bun, data, { cache: false }))
-    row['bun-cached'] = await bench(() => render(tpl.bun, data))
+    row['bun'] = await bench(() => render(tpl.bun, data))
 
     if (ejsMod) {
+      // ejs compile() returns a JS function — pre-compiled
       const fn = ejsMod.compile(tpl.ejs)
       row['ejs'] = await bench(() => fn(data))
     }
     if (hbsMod) {
+      // Handlebars compile() returns a JS function — pre-compiled
       const fn = hbsMod.compile(tpl.hbs)
       row['hbs'] = await bench(() => fn(data))
     }
     if (mustacheMod) {
+      // Mustache has no separate compile — parse + render every call
       row['mustache'] = await bench(() => mustacheMod.render(tpl.mustache, data))
     }
 
@@ -83,15 +85,14 @@ async function main() {
   }
 
   console.log(`\nBenchmark: HTML template rendering (ops/sec, higher is better)\n`)
-
-  const headers = ['Template', '@nds-stack/bun-html (cached)', '@nds-stack/bun-html (no cache)', 'ejs', 'handlebars', 'mustache']
-  console.log(`| ${headers.join(' | ')} |`)
-  console.log(`|${headers.map(() => '---').join('|')}|`)
+  console.log(`All libraries use their default rendering mode (pre-compiled where available).`)
+  console.log(`\n| Template | @nds-stack/bun-html | ejs | handlebars | mustache |`)
+  console.log(`|---|---|---|---|---|`)
 
   for (const tpl of templates) {
     const r = results[tpl.name]!
     console.log(
-      `| ${tpl.name} | ${format(r['bun-cached'] ?? 0)} | ${format(r['bun-nocache'] ?? 0)} | ${format(r.ejs ?? 0)} | ${format(r.hbs ?? 0)} | ${format(r.mustache ?? 0)} |`,
+      `| ${tpl.name} | ${format(r.bun ?? 0)} | ${format(r.ejs ?? 0)} | ${format(r.hbs ?? 0)} | ${format(r.mustache ?? 0)} |`,
     )
   }
   console.log()
