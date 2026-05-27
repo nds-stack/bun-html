@@ -1,4 +1,5 @@
 import type { ASTNode, ExprNode, CompiledTemplate } from './types.js'
+import { validateKey } from './types.js'
 import { parseExpression } from './expression.js'
 
 export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
@@ -8,6 +9,7 @@ export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   body.push('let __h = helpers || {}')
   body.push('let __s = []')
   body.push('let __defs = {}')
+  body.push('let __depth = 0')
 
   genNodes(ast, body)
 
@@ -77,9 +79,11 @@ function genNode(node: ASTNode, body: string[]): void {
     case 'PartialDef': {
       const subBody: string[] = []
       subBody.push('let $ = ""')
+      subBody.push('let __depth = $__depth + 1')
+      subBody.push('if (__depth > 50) throw new Error("Partial recursion too deep (>50)")')
       genNodes(node.children, subBody)
       subBody.push('return $')
-      body.push(`__defs[${JSON.stringify(node.name)}] = function() {\n${subBody.join('\n')}\n}`)
+      body.push(`__defs[${JSON.stringify(node.name)}] = function($__depth) {\n${subBody.join('\n')}\n}`)
       break
     }
 
@@ -87,7 +91,7 @@ function genNode(node: ASTNode, body: string[]): void {
       body.push(`{`)
       body.push(`let __pfn = __defs[${JSON.stringify(node.name)}]`)
       body.push(`if (typeof __pfn === 'function') {`)
-      body.push(`$ += __pfn()`)
+      body.push(`$ += __pfn(__depth)`)
       body.push(`} else {`)
       body.push(`throw new Error('Partial ' + ${JSON.stringify(node.name)} + ' not found. Define it via {{#def "' + ${JSON.stringify(node.name)} + '"}}...{{/def}} or set partialsDir.')`)
       body.push(`}`)
@@ -153,15 +157,20 @@ function genSafePath(expression: string): string {
     rest = rest.slice(3)
   }
 
+  function makePath(parts: string[], prefix: string): string {
+    let code = prefix
+    for (const part of parts) {
+      validateKey(part)
+      code += `?.[${JSON.stringify(part)}]`
+    }
+    return code
+  }
+
   if (levels > 0) {
     if (!rest || rest === 'this') return `__s[Math.max(0, __s.length - ${levels})]`
     if (rest === '@index' || rest === '@key') throw new Error(`Cannot access ${rest} from parent context`)
     const parts = rest.split('.')
-    let code = `__s[Math.max(0, __s.length - ${levels})]`
-    for (const part of parts) {
-      code += `?.[${JSON.stringify(part)}]`
-    }
-    return code
+    return makePath(parts, `__s[Math.max(0, __s.length - ${levels})]`)
   }
 
   if (expression === '@index') return '_i'
@@ -169,11 +178,7 @@ function genSafePath(expression: string): string {
   if (expression === 'this') return '__d'
 
   const parts = expression.split('.')
-  let code = '__d'
-  for (const part of parts) {
-    code += `?.[${JSON.stringify(part)}]`
-  }
-  return code
+  return makePath(parts, '__d')
 }
 
 function genExpr(expr: ExprNode): string {
@@ -202,6 +207,7 @@ function genExpr(expr: ExprNode): string {
         const remaining = expr.path.slice(levels)
         let code = `__s[Math.max(0, __s.length - ${levels})]`
         for (const part of remaining) {
+          validateKey(part)
           code += `?.[${JSON.stringify(part)}]`
         }
         return code
@@ -209,6 +215,7 @@ function genExpr(expr: ExprNode): string {
 
       let code = '__d'
       for (const part of expr.path) {
+        validateKey(part)
         code += `?.[${JSON.stringify(part)}]`
       }
       return code

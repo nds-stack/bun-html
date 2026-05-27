@@ -1,4 +1,12 @@
 import type { ExprNode } from './types.js'
+import { validateKey } from './types.js'
+
+export function formatPosition(obj?: { line?: number; column?: number }): string {
+  if (obj?.line !== undefined && obj?.column !== undefined) {
+    return ` at line ${obj.line}, column ${obj.column}`
+  }
+  return ''
+}
 
 export type ExprTokenType =
   | 'Identifier' | 'Number' | 'String' | 'Boolean' | 'Null' | 'Undefined'
@@ -303,6 +311,7 @@ export function evaluateExpr(
         if (part === '@index') { value = index; break }
         if (part === '@key') { value = key; break }
         if (part === 'this') continue
+        validateKey(part)
         if (value === null || value === undefined) return undefined
         value = (value as any)?.[part]
       }

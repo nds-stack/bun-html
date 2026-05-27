@@ -1,5 +1,5 @@
 import type { Token, ASTNode } from './types.js'
-import { parseExpression } from './expression.js'
+import { parseExpression, formatPosition } from './expression.js'
 
 export function parse(tokens: Token[]): ASTNode[] {
   const nodes: ASTNode[] = []
@@ -19,6 +19,10 @@ interface ParseResult {
   nextIndex: number
 }
 
+function pos(token: Token): string {
+  return formatPosition(token)
+}
+
 function parseNode(tokens: Token[], i: number): ParseResult {
   const token = tokens[i]!
 
@@ -36,45 +40,45 @@ function parseNode(tokens: Token[], i: number): ParseResult {
       return parseEach(tokens, i)
 
     case 'EachClose':
-      throw new Error('Unexpected {{/each}}')
+      throw new Error(`Unexpected {{/each}}${pos(token)}`)
 
     case 'IfOpen':
       return parseIf(tokens, i)
 
     case 'IfClose':
-      throw new Error('Unexpected {{/if}}')
+      throw new Error(`Unexpected {{/if}}${pos(token)}`)
 
     case 'UnlessOpen':
       return parseUnless(tokens, i)
 
     case 'UnlessClose':
-      throw new Error('Unexpected {{/unless}}')
+      throw new Error(`Unexpected {{/unless}}${pos(token)}`)
 
     case 'WithOpen':
       return parseWith(tokens, i)
 
     case 'WithClose':
-      throw new Error('Unexpected {{/with}}')
+      throw new Error(`Unexpected {{/with}}${pos(token)}`)
 
     case 'DefOpen':
       return parseDef(tokens, i)
 
     case 'DefClose':
-      throw new Error('Unexpected {{/def}}')
+      throw new Error(`Unexpected {{/def}}${pos(token)}`)
 
     case 'Partial':
       return { node: { type: 'Partial', name: token.value! }, nextIndex: i + 1 }
 
     case 'Else':
-      throw new Error('Unexpected {{else}}')
+      throw new Error(`Unexpected {{else}}${pos(token)}`)
 
     case 'LayoutOpen':
       return parseLayout(tokens, i)
 
     case 'LayoutClose':
-      throw new Error('Unexpected {{/layout}}')
+      throw new Error(`Unexpected {{/layout}}${pos(token)}`)
     default:
-      throw new Error(`Unknown token type: ${(token as any).type}`)
+      throw new Error(`Unknown token type: ${(token as any).type}${pos(token)}`)
   }
 }
 
@@ -100,14 +104,14 @@ function parseChildren(
 
 function parseEach(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
-  if (!expression.trim()) throw new Error('{{#each}} requires an expression')
+  if (!expression.trim()) throw new Error(`{{#each}} requires an expression${pos(tokens[i]!)}`)
   i++
 
   const { children, nextIndex } = parseChildren(tokens, i, 'EachClose')
   i = nextIndex
 
   if (i >= tokens.length) {
-    throw new Error('Unclosed {{#each}}')
+    throw new Error(`Unclosed {{#each}}${pos(tokens[tokens.length - 1]!)}`)
   }
   i++
 
@@ -116,7 +120,7 @@ function parseEach(tokens: Token[], i: number): ParseResult {
 
 function parseIf(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
-  if (!expression.trim()) throw new Error('{{#if}} requires an expression')
+  if (!expression.trim()) throw new Error(`{{#if}} requires an expression${pos(tokens[i]!)}`)
   i++
 
   const { children: thenChildren, nextIndex: afterThen } = parseChildren(tokens, i, 'IfClose')
@@ -132,7 +136,7 @@ function parseIf(tokens: Token[], i: number): ParseResult {
   }
 
   if (i >= tokens.length) {
-    throw new Error('Unclosed {{#if}}')
+    throw new Error(`Unclosed {{#if}}${pos(tokens[tokens.length - 1]!)}`)
   }
   i++
 
@@ -142,7 +146,7 @@ function parseIf(tokens: Token[], i: number): ParseResult {
       exprAst = parseExpression(expression)
     }
   } catch (e) {
-    throw new Error(`Invalid expression in {{#if}}: "${expression}" — ${(e as Error).message}`)
+    throw new Error(`Invalid expression in {{#if}}: "${expression}"${pos(tokens[i - 1]!)} — ${(e as Error).message}`)
   }
 
   return { node: { type: 'If', expression, exprAst, children: thenChildren, elseChildren }, nextIndex: i }
@@ -150,14 +154,14 @@ function parseIf(tokens: Token[], i: number): ParseResult {
 
 function parseUnless(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
-  if (!expression.trim()) throw new Error('{{#unless}} requires an expression')
+  if (!expression.trim()) throw new Error(`{{#unless}} requires an expression${pos(tokens[i]!)}`)
   i++
 
   const { children, nextIndex } = parseChildren(tokens, i, 'UnlessClose')
   i = nextIndex
 
   if (i >= tokens.length) {
-    throw new Error('Unclosed {{#unless}}')
+    throw new Error(`Unclosed {{#unless}}${pos(tokens[tokens.length - 1]!)}`)
   }
   i++
 
@@ -167,7 +171,7 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
       exprAst = parseExpression(expression)
     }
   } catch (e) {
-    throw new Error(`Invalid expression in {{#unless}}: "${expression}" — ${(e as Error).message}`)
+    throw new Error(`Invalid expression in {{#unless}}: "${expression}"${pos(tokens[i - 1]!)} — ${(e as Error).message}`)
   }
 
   return { node: { type: 'Unless', expression, exprAst, children }, nextIndex: i }
@@ -175,14 +179,14 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
 
 function parseWith(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
-  if (!expression.trim()) throw new Error('{{#with}} requires an expression')
+  if (!expression.trim()) throw new Error(`{{#with}} requires an expression${pos(tokens[i]!)}`)
   i++
 
   const { children, nextIndex } = parseChildren(tokens, i, 'WithClose')
   i = nextIndex
 
   if (i >= tokens.length) {
-    throw new Error('Unclosed {{#with}}')
+    throw new Error(`Unclosed {{#with}}${pos(tokens[tokens.length - 1]!)}`)
   }
   i++
 
@@ -197,7 +201,7 @@ function parseDef(tokens: Token[], i: number): ParseResult {
   i = nextIndex
 
   if (i >= tokens.length) {
-    throw new Error('Unclosed {{#def}}')
+    throw new Error(`Unclosed {{#def}}${pos(tokens[tokens.length - 1]!)}`)
   }
   i++
 
@@ -212,7 +216,7 @@ function parseLayout(tokens: Token[], i: number): ParseResult {
   i = nextIndex
 
   if (i >= tokens.length) {
-    throw new Error('Unclosed {{#layout}}')
+    throw new Error(`Unclosed {{#layout}}${pos(tokens[tokens.length - 1]!)}`)
   }
   i++
 

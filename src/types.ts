@@ -14,6 +14,28 @@ export type ExprNode =
 export interface Token {
   type: 'Text' | 'Variable' | 'RawVariable' | 'EachOpen' | 'EachClose' | 'IfOpen' | 'IfClose' | 'Else' | 'UnlessOpen' | 'UnlessClose' | 'WithOpen' | 'WithClose' | 'DefOpen' | 'DefClose' | 'Partial' | 'LayoutOpen' | 'LayoutClose'
   value?: string
+  line?: number
+  column?: number
+}
+
+const DANGEROUS_KEYS = new Set([
+  '__proto__', 'prototype', 'constructor',
+  'globalThis', 'global', 'process', 'Function',
+  'eval', 'require', 'import', 'Bun',
+  'fetch', 'XMLHttpRequest', 'WebSocket',
+])
+
+export function validateKey(key: string): void {
+  if (DANGEROUS_KEYS.has(key)) {
+    throw new Error(`Access to "${key}" is not allowed for security reasons`)
+  }
+}
+
+export function formatPosition(token: Token): string {
+  if (token.line !== undefined && token.column !== undefined) {
+    return ` at line ${token.line}, column ${token.column}`
+  }
+  return ''
 }
 
 export interface ASTNodeText { type: 'Text'; value: string }

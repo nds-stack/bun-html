@@ -1,4 +1,5 @@
 import type { ASTNode, ASTNodeIf, ASTNodeUnless, RenderOptions, CompiledTemplate } from './types.js'
+import { validateKey } from './types.js'
 import { tokenize } from './lexer.js'
 import { parse } from './parser.js'
 import { evaluateExpr } from './expression.js'
@@ -414,6 +415,7 @@ function resolveValue(expression: string, data: unknown, index?: number, key?: s
 
   const parts = rest.split('.')
   for (const part of parts) {
+    validateKey(part)
     if (!isRecord(value)) return undefined
     value = value[part]
   }

@@ -4,6 +4,19 @@ export function tokenize(template: string): Token[] {
   const tokens: Token[] = []
   let lastIndex = 0
   let pendingStripAfter = false
+  let line = 1
+  let lastLineStart = 0
+
+  function updatePosition(upTo: number): void {
+    for (let i = lastLineStart; i < upTo && i < template.length; i++) {
+      if (template[i] === '\n') { line++; lastLineStart = i + 1 }
+    }
+  }
+
+  function addToken(type: Token['type'], value?: string): void {
+    const col = lastIndex - lastLineStart + 1
+    tokens.push({ type, value, line, column: col })
+  }
 
   const cleaned = template.replace(/\{\{![\s\S]*?\}\}/g, '')
   const re = /\{\{\{(\~?)([\s\S]*?)(\~?)\}\}\}|\{\{(\~?)([\s\S]*?)(\~?)\}\}/g
@@ -17,11 +30,14 @@ export function tokenize(template: string): Token[] {
         pendingStripAfter = false
       }
       if (text) {
-        tokens.push({ type: 'Text', value: text })
+        updatePosition(match.index)
+        addToken('Text', text)
       }
     } else if (pendingStripAfter) {
       pendingStripAfter = false
     }
+
+    updatePosition(match.index)
 
     const isRaw = match[1] !== undefined
     const stripBefore = !!(isRaw ? match[1] : match[4])
@@ -38,44 +54,45 @@ export function tokenize(template: string): Token[] {
     }
 
     if (isRaw) {
-      tokens.push({ type: 'RawVariable', value: content })
+      addToken('RawVariable', content)
     } else if (content === 'else') {
-      tokens.push({ type: 'Else' })
+      addToken('Else')
     } else if (content === '/each') {
-      tokens.push({ type: 'EachClose' })
+      addToken('EachClose')
     } else if (content === '/if') {
-      tokens.push({ type: 'IfClose' })
+      addToken('IfClose')
     } else if (content === '/unless') {
-      tokens.push({ type: 'UnlessClose' })
+      addToken('UnlessClose')
     } else if (content === '/with') {
-      tokens.push({ type: 'WithClose' })
+      addToken('WithClose')
     } else if (content === '/def') {
-      tokens.push({ type: 'DefClose' })
+      addToken('DefClose')
     } else if (content === '/layout') {
-      tokens.push({ type: 'LayoutClose' })
+      addToken('LayoutClose')
     } else if (/^#each(?:\s+|$)/.test(content)) {
-      tokens.push({ type: 'EachOpen', value: content.replace(/^#each\s*/, '').trim() })
+      addToken('EachOpen', content.replace(/^#each\s*/, '').trim())
     } else if (/^#if(?:\s+|$)/.test(content)) {
-      tokens.push({ type: 'IfOpen', value: content.replace(/^#if\s*/, '').trim() })
+      addToken('IfOpen', content.replace(/^#if\s*/, '').trim())
     } else if (/^#unless(?:\s+|$)/.test(content)) {
-      tokens.push({ type: 'UnlessOpen', value: content.replace(/^#unless\s*/, '').trim() })
+      addToken('UnlessOpen', content.replace(/^#unless\s*/, '').trim())
     } else if (/^#with(?:\s+|$)/.test(content)) {
-      tokens.push({ type: 'WithOpen', value: content.replace(/^#with\s*/, '').trim() })
+      addToken('WithOpen', content.replace(/^#with\s*/, '').trim())
     } else if (/^#def(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#def\s*/, '').trim().replace(/^"|"$/g, '')
       if (!name) throw new Error(`Def name cannot be empty: "${content}"`)
       if (name.includes('"') || name.includes(' ')) throw new Error(`Invalid def syntax: "${content}"`)
-      tokens.push({ type: 'DefOpen', value: name })
+      addToken('DefOpen', name)
     } else if (/^#layout(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#layout\s*/, '').trim().replace(/^"|"$/g, '')
       if (name.includes('"') || name.includes(' ')) throw new Error(`Invalid layout syntax: "${content}"`)
-      tokens.push({ type: 'LayoutOpen', value: name })
+      addToken('LayoutOpen', name)
     } else if (content.startsWith('>')) {
-      tokens.push({ type: 'Partial', value: content.slice(1).trim() })
+      addToken('Partial', content.slice(1).trim())
     } else if (content.startsWith('#') || content.startsWith('/')) {
-      throw new Error(`Unknown tag: ${content}`)
+      const pos = formatPos(tokens.length > 0 ? tokens[tokens.length - 1] : undefined)
+      throw new Error(`Unknown tag: ${content}${pos}`)
     } else {
-      tokens.push({ type: 'Variable', value: content })
+      addToken('Variable', content)
     }
 
     if (stripAfter) {
@@ -91,9 +108,17 @@ export function tokenize(template: string): Token[] {
       text = text.replace(/^\s+/, '')
     }
     if (text) {
-      tokens.push({ type: 'Text', value: text })
+      updatePosition(cleaned.length)
+      addToken('Text', text)
     }
   }
 
   return tokens
+}
+
+function formatPos(token: Token | undefined): string {
+  if (token?.line !== undefined && token?.column !== undefined) {
+    return ` at line ${token.line}, column ${token.column}`
+  }
+  return ''
 }
