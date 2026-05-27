@@ -121,7 +121,7 @@ function getConditionValue(
   stack?: unknown[],
 ): unknown {
   if (node.exprAst) {
-    return evaluateExpr(node.exprAst, data, index, key)
+    return evaluateExpr(node.exprAst, data, index, key, stack)
   }
   return resolveValue(node.expression, data, index, key, stack)
 }
