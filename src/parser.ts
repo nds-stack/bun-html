@@ -73,13 +73,15 @@ function parseNode(tokens: Token[], i: number): ParseResult {
 
     case 'LayoutClose':
       throw new Error('Unexpected {{/layout}}')
+    default:
+      throw new Error(`Unknown token type: ${(token as any).type}`)
   }
 }
 
 function parseChildren(
   tokens: Token[],
   startIndex: number,
-  closeType: string,
+  closeType: 'EachClose' | 'IfClose' | 'UnlessClose' | 'WithClose' | 'DefClose' | 'LayoutClose',
 ): { children: ASTNode[]; nextIndex: number } {
   const children: ASTNode[] = []
   let i = startIndex

@@ -5,6 +5,8 @@ import { evaluateExpr } from './expression.js'
 import { compileToFunction } from './compiler.js'
 
 const DEFAULT_CACHE_SIZE = 100
+const MAX_TEMPLATE_LENGTH = 1_000_000
+const NO_ESCAPE = (s: string): string => s
 
 class BoundedCache<K, V> {
   private max: number
@@ -73,6 +75,7 @@ export function purgeTemplate(template: string): boolean {
 }
 
 export function compile(template: string, options?: RenderOptions): ASTNode[] {
+  if (template.length > MAX_TEMPLATE_LENGTH) throw new Error(`Template exceeds maximum length of ${MAX_TEMPLATE_LENGTH}`)
   const doCache = options?.cache !== false
 
   if (doCache) {
@@ -94,7 +97,7 @@ export function render(
   data: Record<string, unknown>,
   options?: RenderOptions,
 ): string | Promise<string> {
-  const opts: RenderOptions = options ?? {}
+  let opts: RenderOptions = options ?? {}
 
   const plugins = opts.plugins ?? []
   let mergedHelpers = opts.helpers
@@ -112,7 +115,7 @@ export function render(
     }
   }
 
-  opts.helpers = mergedHelpers
+  opts = { ...opts, helpers: mergedHelpers }
 
   if (opts.partialsDir) {
     const ast = compile(tpl, opts)
@@ -131,13 +134,16 @@ export function render(
   if (doCache) {
     fn = compiledCache.get(tpl)
     if (!fn) {
-      const ast = parse(tokenize(tpl))
-      templateCache.set(tpl, ast)
+      let ast = templateCache.get(tpl)
+      if (!ast) {
+        ast = parse(tokenize(tpl))
+        templateCache.set(tpl, ast)
+      }
       fn = compileToFunction(ast)
       compiledCache.set(tpl, fn)
     }
   } else {
-    const ast = parse(tokenize(tpl))
+    let ast = templateCache.get(tpl) ?? parse(tokenize(tpl))
     fn = compileToFunction(ast)
   }
 
@@ -151,14 +157,13 @@ export function render(
 }
 
 const encoder = new TextEncoder()
-const NO_ESCAPE = (s: string): string => s
 
 export function renderStream(
   template: string,
   data: Record<string, unknown>,
   options?: RenderOptions,
 ): ReadableStream<Uint8Array> {
-  const opts: RenderOptions = options ?? {}
+  let opts: RenderOptions = options ?? {}
 
   const plugins = opts.plugins ?? []
   let mergedHelpers = opts.helpers
@@ -176,7 +181,7 @@ export function renderStream(
     }
   }
 
-  opts.helpers = mergedHelpers
+  opts = { ...opts, helpers: mergedHelpers }
   const ast = compile(tpl, opts)
 
   return new ReadableStream({
@@ -184,7 +189,12 @@ export function renderStream(
       try {
         for (const node of ast) {
           const chunk = await renderNodeAsync(node, dt, opts, { stack: [dt], defs: {} })
-          if (chunk) controller.enqueue(encoder.encode(chunk))
+          if (chunk) {
+            if (controller.desiredSize !== null && controller.desiredSize <= 0) {
+              await new Promise(r => setTimeout(r, 0))
+            }
+            controller.enqueue(encoder.encode(chunk))
+          }
         }
         controller.close()
       } catch (e) {
