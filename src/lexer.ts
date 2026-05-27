@@ -3,18 +3,38 @@ import type { Token } from './types.js'
 export function tokenize(template: string): Token[] {
   const tokens: Token[] = []
   let lastIndex = 0
+  let pendingStripAfter = false
 
-  const re = /\{\{\{([\s\S]*?)\}\}\}|\{\{([\s\S]*?)\}\}/g
+  const re = /\{\{\{(\~?)([\s\S]*?)(\~?)\}\}\}|\{\{(\~?)([\s\S]*?)(\~?)\}\}/g
 
   let match: RegExpExecArray | null
   while ((match = re.exec(template)) !== null) {
     if (match.index > lastIndex) {
-      tokens.push({ type: 'Text', value: template.slice(lastIndex, match.index) })
+      let text = template.slice(lastIndex, match.index)
+      if (pendingStripAfter) {
+        text = text.replace(/^\s+/, '')
+        pendingStripAfter = false
+      }
+      if (text) {
+        tokens.push({ type: 'Text', value: text })
+      }
+    } else if (pendingStripAfter) {
+      pendingStripAfter = false
     }
 
     const isRaw = match[1] !== undefined
-    const inner = (isRaw ? match[1] : match[2])!
+    const stripBefore = !!(isRaw ? match[1] : match[4])
+    const inner = (isRaw ? match[2] : match[5])!
+    const stripAfter = !!(isRaw ? match[3] : match[6])
     const content = inner.trim()
+
+    if (stripBefore && tokens.length > 0) {
+      const last = tokens[tokens.length - 1]!
+      if (last.type === 'Text' && last.value) {
+        last.value = last.value.replace(/\s+$/, '')
+        if (last.value === '') tokens.pop()
+      }
+    }
 
     if (isRaw) {
       tokens.push({ type: 'RawVariable', value: content })
@@ -45,11 +65,21 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'Variable', value: content })
     }
 
+    if (stripAfter) {
+      pendingStripAfter = true
+    }
+
     lastIndex = re.lastIndex
   }
 
   if (lastIndex < template.length) {
-    tokens.push({ type: 'Text', value: template.slice(lastIndex) })
+    let text = template.slice(lastIndex)
+    if (pendingStripAfter) {
+      text = text.replace(/^\s+/, '')
+    }
+    if (text) {
+      tokens.push({ type: 'Text', value: text })
+    }
   }
 
   return tokens

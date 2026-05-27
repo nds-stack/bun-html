@@ -143,4 +143,86 @@ describe('bun-html', () => {
     expect(result).toBe('0-0:a|1-1:b|')
   })
 
+  test('whitespace control: strip after tag', () => {
+    const result = render('a {{~b}} c', { b: 'B' })
+    expect(result).toBe('aB c')
+  })
+
+  test('whitespace control: strip before tag', () => {
+    const result = render('a {{b~}} c', { b: 'B' })
+    expect(result).toBe('a Bc')
+  })
+
+  test('whitespace control: strip both sides', () => {
+    const result = render('a {{~b~}} c', { b: 'B' })
+    expect(result).toBe('aBc')
+  })
+
+  test('whitespace control: strip around block tags', () => {
+    const result = render('before {{~#if show~}}\n  visible\n{{~/if~}} after', { show: true })
+    expect(result).toBe('beforevisibleafter')
+  })
+
+  test('whitespace control: strip around each loop', () => {
+    const result = render('{{~#each items~}}\n  {{this}}\n{{~/each~}}', { items: ['a', 'b'] })
+    expect(result).toBe('ab')
+  })
+
+  test('whitespace control: no strip when tilde absent', () => {
+    const result = render('a {{b}} c', { b: 'B' })
+    expect(result).toBe('a B c')
+  })
+
+  test('expression: comparison in {{#if}}', () => {
+    expect(render('{{#if age > 18}}adult{{/if}}', { age: 25 })).toBe('adult')
+    expect(render('{{#if age > 18}}adult{{/if}}', { age: 15 })).toBe('')
+  })
+
+  test('expression: multiple comparisons in {{#if}}', () => {
+    expect(render('{{#if age >= 18}}adult{{/if}}', { age: 18 })).toBe('adult')
+    expect(render('{{#if age < 18}}minor{{/if}}', { age: 15 })).toBe('minor')
+    expect(render('{{#if age <= 12}}kid{{/if}}', { age: 12 })).toBe('kid')
+  })
+
+  test('expression: equality in {{#if}}', () => {
+    expect(render('{{#if role == "admin"}}ADMIN{{/if}}', { role: 'admin' })).toBe('ADMIN')
+    expect(render('{{#if role == "admin"}}ADMIN{{/if}}', { role: 'user' })).toBe('')
+    expect(render('{{#if role != "admin"}}user{{/if}}', { role: 'user' })).toBe('user')
+  })
+
+  test('expression: logical AND in {{#if}}', () => {
+    expect(render('{{#if active && admin}}yes{{/if}}', { active: true, admin: true })).toBe('yes')
+    expect(render('{{#if active && admin}}yes{{/if}}', { active: true, admin: false })).toBe('')
+  })
+
+  test('expression: logical OR in {{#if}}', () => {
+    expect(render('{{#if admin || moderator}}access{{/if}}', { admin: false, moderator: true })).toBe('access')
+    expect(render('{{#if admin || moderator}}access{{/if}}', { admin: false, moderator: false })).toBe('')
+  })
+
+  test('expression: negation in {{#if}}', () => {
+    expect(render('{{#if !disabled}}active{{/if}}', { disabled: false })).toBe('active')
+    expect(render('{{#if !disabled}}active{{/if}}', { disabled: true })).toBe('')
+  })
+
+  test('expression: parentheses in {{#if}}', () => {
+    expect(render('{{#if (age > 18) && (role == "admin")}}yes{{/if}}', { age: 25, role: 'admin' })).toBe('yes')
+  })
+
+  test('expression: combined with whitespace control', () => {
+    const result = render('{{~#if age > 18~}}\n  adult\n{{~/if~}}', { age: 25 })
+    expect(result).toBe('adult')
+  })
+
+  test('expression: {{#unless}} with comparison', () => {
+    expect(render('{{#unless age >= 18}}minor{{/unless}}', { age: 15 })).toBe('minor')
+    expect(render('{{#unless age >= 18}}minor{{/unless}}', { age: 20 })).toBe('')
+  })
+
+  test('expression: truthy variable as condition (backward compat)', () => {
+    expect(render('{{#if show}}yes{{/if}}', { show: true })).toBe('yes')
+    expect(render('{{#if user}}yes{{/if}}', { user: { name: 'A' } })).toBe('yes')
+    expect(render('{{#if items.length}}has items{{/if}}', { items: [1, 2] })).toBe('has items')
+  })
+
 })

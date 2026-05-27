@@ -42,12 +42,21 @@ Compiles a template string into an AST array. Results are cached unless `cache: 
 | `{{var}}` | Auto-escaped interpolation |
 | `{{{var}}}` | Raw (unescaped) interpolation |
 | `{{#each items}}...{{/each}}` | Loop — context: `{{this}}`, `{{@index}}`, `{{@key}}` |
-| `{{#if cond}}...{{else}}...{{/if}}` | Conditional |
-| `{{#unless cond}}...{{/unless}}` | Inverse conditional |
+| `{{#if cond}}...{{else}}...{{/if}}` | Conditional — supports expressions: `{{#if age > 18}}` |
+| `{{#unless cond}}...{{/unless}}` | Inverse conditional — supports expressions |
 | `{{> partialName}}` | Partial (async, loaded via `Bun.file()`) |
 | `{{#layout "name"}}...{{/layout}}` | Layout wrapper (content available as `{{content}}`) |
 
 Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
+
+**Whitespace control:** Add `~` inside mustache delimiters to strip adjacent whitespace:
+| Syntax | Description |
+|--------|-------------|
+| `{{~tag}}` | Strip whitespace before the tag |
+| `{{tag~}}` | Strip whitespace after the tag |
+| `{{~tag~}}` | Strip both sides |
+| `{{{~raw~}}}` | Same for raw `{{{}}}` tags |
+| `{{~#if~}}`, `{{~/if~}}` | Strip around block open/close tags |
 
 ### RenderOptions
 
@@ -71,11 +80,10 @@ interface RenderOptions {
 
 ## Limitations
 
-- No whitespace trimming (all whitespace in templates is preserved)
-- No expression evaluation (variables only — no `{{#if user.age > 18}}`)
 - No parent context access (`{{../var}}`) in nested blocks
 - Partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
+- Expression support limited to conditionals (`{{#if}}`, `{{#unless}}`) — variable interpolation uses simple path resolution
 
 ## Multi-Instance / Cross-Boundary
 
@@ -138,8 +146,8 @@ await render('{{#layout "main"}}{{content}}{{/layout}}', data, {
 | Conditionals | ✅ | ❌ | ✅ | ✅ |
 | Helpers | ✅ | ❌ | ✅ | ✅ |
 | Template caching | ✅ | ❌ | ✅ | ✅ |
-| Whitespace control | ❌ | ❌ | ✅ | ✅ |
-| Expressions | ❌ | ❌ | ❌ | ✅ |
+| Whitespace control | ✅ | ❌ | ✅ | ✅ |
+| Expressions | ✅ | ❌ | ❌ | ✅ |
 
 ## Benchmarks
 

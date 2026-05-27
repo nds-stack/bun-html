@@ -1,0 +1,224 @@
+import type { ExprNode } from './types.js'
+
+export type ExprTokenType =
+  | 'Identifier' | 'Number' | 'String' | 'Boolean' | 'Null' | 'Undefined'
+  | 'ParenOpen' | 'ParenClose'
+  | 'Not' | 'And' | 'Or'
+  | 'Gt' | 'Lt' | 'Gte' | 'Lte' | 'Eq' | 'Neq'
+
+export interface ExprToken {
+  type: ExprTokenType
+  value?: string
+}
+
+export function tokenizeExpr(input: string): ExprToken[] {
+  const tokens: ExprToken[] = []
+  let i = 0
+
+  while (i < input.length) {
+    if (/\s/.test(input[i]!)) { i++; continue }
+
+    if (input[i] === "'" || input[i] === '"') {
+      const quote = input[i]!
+      let j = i + 1
+      while (j < input.length && input[j] !== quote) j++
+      tokens.push({ type: 'String', value: input.slice(i + 1, j) })
+      i = j + 1
+      continue
+    }
+
+    if (/\d/.test(input[i]!)) {
+      let j = i
+      while (j < input.length && /[\d.eE+-]/.test(input[j]!)) j++
+      tokens.push({ type: 'Number', value: input.slice(i, j) })
+      i = j
+      continue
+    }
+
+    if (/[a-zA-Z_$]/.test(input[i]!)) {
+      let j = i
+      while (j < input.length && /[a-zA-Z0-9_$.]/.test(input[j]!)) j++
+      const word = input.slice(i, j)
+      if (word === 'true' || word === 'false') tokens.push({ type: 'Boolean', value: word })
+      else if (word === 'null') tokens.push({ type: 'Null' })
+      else if (word === 'undefined') tokens.push({ type: 'Undefined' })
+      else tokens.push({ type: 'Identifier', value: word })
+      i = j
+      continue
+    }
+
+    const two = input.slice(i, i + 2)
+    if (two === '&&') { tokens.push({ type: 'And' }); i += 2; continue }
+    if (two === '||') { tokens.push({ type: 'Or' }); i += 2; continue }
+    if (two === '>=') { tokens.push({ type: 'Gte' }); i += 2; continue }
+    if (two === '<=') { tokens.push({ type: 'Lte' }); i += 2; continue }
+    if (two === '==') { tokens.push({ type: 'Eq' }); i += 2; continue }
+    if (two === '!=') { tokens.push({ type: 'Neq' }); i += 2; continue }
+
+    if (input[i] === '(') { tokens.push({ type: 'ParenOpen' }); i++; continue }
+    if (input[i] === ')') { tokens.push({ type: 'ParenClose' }); i++; continue }
+    if (input[i] === '>') { tokens.push({ type: 'Gt' }); i++; continue }
+    if (input[i] === '<') { tokens.push({ type: 'Lt' }); i++; continue }
+    if (input[i] === '!') { tokens.push({ type: 'Not' }); i++; continue }
+
+    throw new Error(`Unexpected character '${input[i]}' in expression`)
+  }
+
+  return tokens
+}
+
+function parseTokens(tokens: ExprToken[]): ExprNode {
+  let pos = 0
+
+  function peek(): ExprToken | undefined {
+    return tokens[pos]
+  }
+
+  function consume(type?: ExprTokenType): ExprToken {
+    const token = tokens[pos]
+    if (!token) throw new Error('Unexpected end of expression')
+    if (type !== undefined && token.type !== type) {
+      throw new Error(`Expected ${type}, got ${token.type} (${token.value ?? ''})`)
+    }
+    pos++
+    return token
+  }
+
+  function parsePrimary(): ExprNode {
+    const token = peek()
+    if (!token) throw new Error('Unexpected end of expression')
+
+    switch (token.type) {
+      case 'Number':
+        consume()
+        return { type: 'Number', value: parseFloat(token.value!) }
+      case 'String':
+        consume()
+        return { type: 'String', value: token.value! }
+      case 'Boolean':
+        consume()
+        return { type: 'Boolean', value: token.value === 'true' }
+      case 'Null':
+        consume()
+        return { type: 'Null' }
+      case 'Undefined':
+        consume()
+        return { type: 'Undefined' }
+      case 'Identifier': {
+        consume()
+        return { type: 'Identifier', path: token.value!.split('.') }
+      }
+      case 'ParenOpen':
+        consume()
+        const expr = parseOr()
+        consume('ParenClose')
+        return expr
+      default:
+        throw new Error(`Unexpected token: ${token.type}`)
+    }
+  }
+
+  function parseNot(): ExprNode {
+    if (peek()?.type === 'Not') {
+      consume()
+      return { type: 'UnaryNot', operand: parseNot() }
+    }
+    return parsePrimary()
+  }
+
+  function parseComparison(): ExprNode {
+    let left = parseNot()
+    const token = peek()
+    if (token && ['Gt', 'Lt', 'Gte', 'Lte', 'Eq', 'Neq'].includes(token.type)) {
+      consume()
+      const opMap: Record<string, '>' | '<' | '>=' | '<=' | '==' | '!='> = {
+        Gt: '>', Lt: '<', Gte: '>=', Lte: '<=', Eq: '==', Neq: '!=',
+      }
+      const op = opMap[token.type]!
+      const right = parseNot()
+      left = { type: 'BinaryOp', op, left, right }
+    }
+    return left
+  }
+
+  function parseAnd(): ExprNode {
+    let left = parseComparison()
+    while (peek()?.type === 'And') {
+      consume()
+      const right = parseComparison()
+      left = { type: 'BinaryOp', op: '&&', left, right }
+    }
+    return left
+  }
+
+  function parseOr(): ExprNode {
+    let left = parseAnd()
+    while (peek()?.type === 'Or') {
+      consume()
+      const right = parseAnd()
+      left = { type: 'BinaryOp', op: '||', left, right }
+    }
+    return left
+  }
+
+  const result = parseOr()
+  if (pos < tokens.length) {
+    throw new Error(`Unexpected token after expression: ${tokens[pos]!.type}`)
+  }
+  return result
+}
+
+export function parseExpression(input: string): ExprNode {
+  const trimmed = input.trim()
+  if (!trimmed) throw new Error('Empty expression')
+  const exTokens = tokenizeExpr(trimmed)
+  return parseTokens(exTokens)
+}
+
+export function evaluateExpr(
+  node: ExprNode,
+  data: unknown,
+  index?: number,
+  key?: string,
+): unknown {
+  switch (node.type) {
+    case 'Number':
+    case 'String':
+    case 'Boolean':
+      return node.value
+    case 'Null':
+      return null
+    case 'Undefined':
+      return undefined
+    case 'Identifier': {
+      if (node.path.length === 0) return undefined
+      let value: unknown = data
+      for (const part of node.path) {
+        if (part === '@index') { value = index; break }
+        if (part === '@key') { value = key; break }
+        if (part === 'this') continue
+        if (value === null || value === undefined) return undefined
+        if (typeof value !== 'object') return undefined
+        value = (value as Record<string, unknown>)[part]
+      }
+      return value
+    }
+    case 'UnaryNot': {
+      return !evaluateExpr(node.operand, data, index, key)
+    }
+    case 'BinaryOp': {
+      const left = evaluateExpr(node.left, data, index, key)
+      const right = evaluateExpr(node.right, data, index, key)
+      switch (node.op) {
+        case '&&': return left && right
+        case '||': return left || right
+        case '>': return Number(left) > Number(right)
+        case '<': return Number(left) < Number(right)
+        case '>=': return Number(left) >= Number(right)
+        case '<=': return Number(left) <= Number(right)
+        case '==': return left == right
+        case '!=': return left != right
+      }
+    }
+  }
+}

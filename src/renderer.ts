@@ -1,6 +1,7 @@
-import type { ASTNode, RenderOptions } from './types.js'
+import type { ASTNode, ASTNodeIf, ASTNodeUnless, RenderOptions } from './types.js'
 import { tokenize } from './lexer.js'
 import { parse } from './parser.js'
+import { evaluateExpr } from './expression.js'
 
 const DEFAULT_CACHE_SIZE = 100
 
@@ -87,6 +88,18 @@ export function render(
   return renderSync(ast, data, opts)
 }
 
+function getConditionValue(
+  node: ASTNodeIf | ASTNodeUnless,
+  data: unknown,
+  index?: number,
+  key?: string,
+): unknown {
+  if (node.exprAst) {
+    return evaluateExpr(node.exprAst, data, index, key)
+  }
+  return resolveValue(node.expression, data, index, key)
+}
+
 function renderSync(ast: ASTNode[], data: unknown, options: RenderOptions): string {
   let output = ''
   for (const node of ast) {
@@ -141,7 +154,7 @@ function renderNodeSync(
     }
 
     case 'If': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const value = getConditionValue(node, data, ctx.index, ctx.key)
       if (value) {
         let output = ''
         for (const child of node.children) {
@@ -160,7 +173,7 @@ function renderNodeSync(
     }
 
     case 'Unless': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const value = getConditionValue(node, data, ctx.index, ctx.key)
       if (!value) {
         let output = ''
         for (const child of node.children) {
@@ -233,7 +246,7 @@ async function renderNodeAsync(
     }
 
     case 'If': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const value = getConditionValue(node, data, ctx.index, ctx.key)
       if (value) {
         let output = ''
         for (const child of node.children) {
@@ -252,7 +265,7 @@ async function renderNodeAsync(
     }
 
     case 'Unless': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const value = getConditionValue(node, data, ctx.index, ctx.key)
       if (!value) {
         let output = ''
         for (const child of node.children) {

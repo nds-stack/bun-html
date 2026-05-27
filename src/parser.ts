@@ -1,4 +1,5 @@
 import type { Token, ASTNode } from './types.js'
+import { parseExpression } from './expression.js'
 
 export function parse(tokens: Token[]): ASTNode[] {
   const nodes: ASTNode[] = []
@@ -119,7 +120,16 @@ function parseIf(tokens: Token[], i: number): ParseResult {
   }
   i++
 
-  return { node: { type: 'If', expression, children: thenChildren, elseChildren }, nextIndex: i }
+  let exprAst
+  try {
+    if (expression.trim()) {
+      exprAst = parseExpression(expression)
+    }
+  } catch {
+    // If expression parsing fails, treat as simple identifier (backward compat)
+  }
+
+  return { node: { type: 'If', expression, exprAst, children: thenChildren, elseChildren }, nextIndex: i }
 }
 
 function parseUnless(tokens: Token[], i: number): ParseResult {
@@ -134,7 +144,16 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
   }
   i++
 
-  return { node: { type: 'Unless', expression, children }, nextIndex: i }
+  let exprAst
+  try {
+    if (expression.trim()) {
+      exprAst = parseExpression(expression)
+    }
+  } catch {
+    // If expression parsing fails, treat as simple identifier
+  }
+
+  return { node: { type: 'Unless', expression, exprAst, children }, nextIndex: i }
 }
 
 function parseLayout(tokens: Token[], i: number): ParseResult {
