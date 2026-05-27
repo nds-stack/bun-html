@@ -1,11 +1,6 @@
 # Changelog
 
-## [0.1.0-alpha.4] — 2026-05-27
-
-### Added
-- Variable interpolation expressions — function calls (`{{name.toUpperCase()}}`), arithmetic (`{{count + 1}}`), ternary (`{{age >= 18 ? "adult" : "minor"}}`)
-- Full operator precedence: `!`, `-` (unary), `*`, `/`, `+`, `-`, comparison, `&&`, `||`, ternary
-- Expression support in `{{var}}` and `{{{var}}}` (previously only in `{{#if}}`)
+## [0.1.0-alpha.5] — 2026-05-27
 
 ### Fixed
 - Async path (partialsDir): parent context `../var` now correctly pushes parent scope instead of current item in `Each` and `With` blocks
@@ -17,6 +12,16 @@
 - Single quote in partial name no longer breaks generated error message
 - `callee(...args)` now used instead of `callee.apply(null, args)` for consistency with compiled path
 - README limitation updated: compiled path supports full expressions; async path limited to conditionals
+
+## [0.1.0-alpha.4] — 2026-05-27
+
+### Added
+- Variable interpolation expressions — function calls (`{{name.toUpperCase()}}`), arithmetic (`{{count + 1}}`), ternary (`{{age >= 18 ? "adult" : "minor"}}`)
+- Full operator precedence: `!`, `-` (unary), `*`, `/`, `+`, `-`, comparison, `&&`, `||`, ternary
+- Expression support in `{{var}}` and `{{{var}}}` (previously only in `{{#if}}`)
+
+### Fixed
+- async parent context stack, evaluateExpr primitive access, purgeTemplate return, readme limitation (moved to alpha.5)
 
 ## [0.1.0-alpha.3] — 2026-05-27
 
