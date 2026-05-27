@@ -10,6 +10,7 @@ export type {
   ASTNodeIf,
   ASTNodeUnless,
   ASTNodeWith,
+  ASTNodePartialDef,
   ASTNodePartial,
   ASTNodeLayout,
 } from './types.js'

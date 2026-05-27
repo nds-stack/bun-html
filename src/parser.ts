@@ -56,6 +56,12 @@ function parseNode(tokens: Token[], i: number): ParseResult {
     case 'WithClose':
       throw new Error('Unexpected {{/with}}')
 
+    case 'DefOpen':
+      return parseDef(tokens, i)
+
+    case 'DefClose':
+      throw new Error('Unexpected {{/def}}')
+
     case 'Partial':
       return { node: { type: 'Partial', name: token.value! }, nextIndex: i + 1 }
 
@@ -175,6 +181,21 @@ function parseWith(tokens: Token[], i: number): ParseResult {
   i++
 
   return { node: { type: 'With', expression, children }, nextIndex: i }
+}
+
+function parseDef(tokens: Token[], i: number): ParseResult {
+  const name = tokens[i]!.value!
+  i++
+
+  const { children, nextIndex } = parseChildren(tokens, i, 'DefClose')
+  i = nextIndex
+
+  if (i >= tokens.length) {
+    throw new Error('Unclosed {{#def}}')
+  }
+  i++
+
+  return { node: { type: 'PartialDef', name, children }, nextIndex: i }
 }
 
 function parseLayout(tokens: Token[], i: number): ParseResult {

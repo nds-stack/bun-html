@@ -83,7 +83,8 @@ See [Framework Adapters](#framework-adapters) for full usage.
 | `{{#unless cond}}...{{/unless}}` | Inverse conditional — supports expressions |
 | `{{#with key}}...{{/with}}` | Scoped context — changes `__d` to `key` within the block |
 | `{{! comment }}` | Comment — stripped entirely from output |
-| `{{> partialName}}` | Partial (async, loaded via `Bun.file()`) |
+| `{{#def "name"}}...{{/def}}` | Inline partial — reusable block, invoked via `{{> name}}` |
+| `{{> partialName}}` | Partial (inline def first, then file via `Bun.file()`) |
 | `{{#layout "name"}}...{{/layout}}` | Layout wrapper (content available as `{{content}}`) |
 
 Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
@@ -217,6 +218,14 @@ render('{{#with user}}<h1>{{name}}</h1>{{/with}}', { user: { name: 'Alice' } })
 ```ts
 render('Hello{{! this is a comment }}World', {})
 // → 'HelloWorld'
+```
+
+### Inline partials
+```ts
+render('{{#def "item"}}<li>{{name}}</li>{{/def}}{{#each items}}{{> item}}{{/each}}', {
+  items: [{ name: 'A' }, { name: 'B' }],
+})
+// → '<li>A</li><li>B</li>'
 ```
 
 ## Framework Adapters

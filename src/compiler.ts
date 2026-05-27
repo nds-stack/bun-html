@@ -6,6 +6,7 @@ export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   body.push('let __d = data')
   body.push('let __h = helpers || {}')
   body.push('let __s = []')
+  body.push('let __defs = {}')
 
   genNodes(ast, body)
 
@@ -72,8 +73,26 @@ function genNode(node: ASTNode, body: string[]): void {
       break
     }
 
-    case 'Partial':
-      throw new Error('Partials require partialsDir option')
+    case 'PartialDef': {
+      const subBody: string[] = []
+      subBody.push('let $ = ""')
+      genNodes(node.children, subBody)
+      subBody.push('return $')
+      body.push(`__defs[${JSON.stringify(node.name)}] = function() {\n${subBody.join('\n')}\n}`)
+      break
+    }
+
+    case 'Partial': {
+      body.push(`{`)
+      body.push(`let __pfn = __defs[${JSON.stringify(node.name)}]`)
+      body.push(`if (typeof __pfn === 'function') {`)
+      body.push(`$ += __pfn()`)
+      body.push(`} else {`)
+      body.push(`throw new Error('Partial "${node.name}" not found. Define it via {{#def "${node.name}"}}...{{/def}} or set partialsDir.')`)
+      body.push(`}`)
+      body.push(`}`)
+      break
+    }
 
     case 'Layout':
       throw new Error('Layouts require partialsDir option')

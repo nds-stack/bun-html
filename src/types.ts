@@ -9,7 +9,7 @@ export type ExprNode =
   | { type: 'BinaryOp'; op: '&&' | '||' | '>' | '<' | '>=' | '<=' | '==' | '!='; left: ExprNode; right: ExprNode }
 
 export interface Token {
-  type: 'Text' | 'Variable' | 'RawVariable' | 'EachOpen' | 'EachClose' | 'IfOpen' | 'IfClose' | 'Else' | 'UnlessOpen' | 'UnlessClose' | 'WithOpen' | 'WithClose' | 'Partial' | 'LayoutOpen' | 'LayoutClose'
+  type: 'Text' | 'Variable' | 'RawVariable' | 'EachOpen' | 'EachClose' | 'IfOpen' | 'IfClose' | 'Else' | 'UnlessOpen' | 'UnlessClose' | 'WithOpen' | 'WithClose' | 'DefOpen' | 'DefClose' | 'Partial' | 'LayoutOpen' | 'LayoutClose'
   value?: string
 }
 
@@ -20,10 +20,11 @@ export interface ASTNodeEach { type: 'Each'; expression: string; children: ASTNo
 export interface ASTNodeIf { type: 'If'; expression: string; exprAst?: ExprNode; children: ASTNode[]; elseChildren: ASTNode[] }
 export interface ASTNodeUnless { type: 'Unless'; expression: string; exprAst?: ExprNode; children: ASTNode[] }
 export interface ASTNodeWith { type: 'With'; expression: string; children: ASTNode[] }
+export interface ASTNodePartialDef { type: 'PartialDef'; name: string; children: ASTNode[] }
 export interface ASTNodePartial { type: 'Partial'; name: string }
 export interface ASTNodeLayout { type: 'Layout'; name: string; children: ASTNode[] }
 
-export type ASTNode = ASTNodeText | ASTNodeVariable | ASTNodeRawVariable | ASTNodeEach | ASTNodeIf | ASTNodeUnless | ASTNodeWith | ASTNodePartial | ASTNodeLayout
+export type ASTNode = ASTNodeText | ASTNodeVariable | ASTNodeRawVariable | ASTNodeEach | ASTNodeIf | ASTNodeUnless | ASTNodeWith | ASTNodePartialDef | ASTNodePartial | ASTNodeLayout
 
 export type CompiledTemplate = (
   data: unknown,

@@ -129,7 +129,7 @@ function getConditionValue(
 async function renderAsync(ast: ASTNode[], data: unknown, options: RenderOptions): Promise<string> {
   let output = ''
   for (const node of ast) {
-    output += await renderNodeAsync(node, data, options, { stack: [data] })
+    output += await renderNodeAsync(node, data, options, { stack: [data], defs: {} })
   }
   return output
 }
@@ -138,7 +138,7 @@ async function renderNodeAsync(
   node: ASTNode,
   data: unknown,
   options: RenderOptions,
-  ctx: { index?: number; key?: string; stack?: unknown[] },
+  ctx: { index?: number; key?: string; stack?: unknown[]; defs?: Record<string, ASTNode[]> },
 ): Promise<string> {
   switch (node.type) {
     case 'Text':
@@ -172,7 +172,7 @@ async function renderNodeAsync(
 
       let output = ''
       for (let i = 0; i < entries.length; i++) {
-        const newCtx = { index: i, key: keys[i], stack: [...(ctx.stack ?? []), entries[i]] }
+        const newCtx = { index: i, key: keys[i], stack: [...(ctx.stack ?? []), entries[i]], defs: ctx.defs }
         for (const child of node.children) {
           output += await renderNodeAsync(child, entries[i], options, newCtx)
         }
@@ -215,14 +215,28 @@ async function renderNodeAsync(
       const sub = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (sub === null || sub === undefined || typeof sub !== 'object') return ''
       let output = ''
-      const newCtx = { stack: [...(ctx.stack ?? []), sub] }
+      const newCtx = { stack: [...(ctx.stack ?? []), sub], defs: ctx.defs }
       for (const child of node.children) {
         output += await renderNodeAsync(child, sub, options, newCtx)
       }
       return output
     }
 
+    case 'PartialDef': {
+      if (!ctx.defs) ctx.defs = {}
+      ctx.defs[node.name] = node.children
+      return ''
+    }
+
     case 'Partial': {
+      const defs = ctx.defs?.[node.name]
+      if (defs) {
+        let output = ''
+        for (const child of defs) {
+          output += await renderNodeAsync(child, data, options, ctx)
+        }
+        return output
+      }
       const dir = options.partialsDir
       if (!dir) throw new Error('Partials require partialsDir option')
       validatePartialName(node.name)

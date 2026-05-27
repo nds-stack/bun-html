@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.3] — 2026-05-27
+
+### Added
+- Inline partials: `{{#def "name"}}...{{/def}}` + `{{> name}}`
+- Inline partials take priority over file-based partials when `partialsDir` is set
+- `{{> name}}` without a matching `{{#def}}` or `partialsDir` now throws a clear error
+
 ## [0.1.0-alpha.2] — 2026-05-27
 
 ### Added

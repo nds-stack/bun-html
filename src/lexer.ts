@@ -49,6 +49,8 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'UnlessClose' })
     } else if (content === '/with') {
       tokens.push({ type: 'WithClose' })
+    } else if (content === '/def') {
+      tokens.push({ type: 'DefClose' })
     } else if (content === '/layout') {
       tokens.push({ type: 'LayoutClose' })
     } else if (/^#each(?:\s+|$)/.test(content)) {
@@ -59,6 +61,10 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'UnlessOpen', value: content.replace(/^#unless\s*/, '').trim() })
     } else if (/^#with(?:\s+|$)/.test(content)) {
       tokens.push({ type: 'WithOpen', value: content.replace(/^#with\s*/, '').trim() })
+    } else if (/^#def(?:\s+|$)/.test(content)) {
+      const name = content.replace(/^#def\s*/, '').trim().replace(/^"|"$/g, '')
+      if (name.includes('"') || name.includes(' ') || !name) throw new Error(`Invalid def syntax: "${content}"`)
+      tokens.push({ type: 'DefOpen', value: name })
     } else if (/^#layout(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#layout\s*/, '').trim().replace(/^"|"$/g, '')
       if (name.includes('"') || name.includes(' ')) throw new Error(`Invalid layout syntax: "${content}"`)

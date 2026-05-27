@@ -314,4 +314,28 @@ describe('bun-html', () => {
     expect(result).toBe('AB')
   })
 
+  test('inline partial {{#def}} renders via {{> name}}', () => {
+    const result = render('{{#def "item"}}<li>{{name}}</li>{{/def}}{{#each items}}{{> item}}{{/each}}', {
+      items: [{ name: 'A' }, { name: 'B' }],
+    })
+    expect(result).toBe('<li>A</li><li>B</li>')
+  })
+
+  test('inline partial with parent context', () => {
+    const result = render('{{#def "item"}}{{../prefix}}: {{name}},{{/def}}{{#each items}}{{> item}}{{/each}}', {
+      prefix: 'User',
+      items: [{ name: 'A' }, { name: 'B' }],
+    })
+    expect(result).toBe('User: A,User: B,')
+  })
+
+  test('inline partial does not render in place', () => {
+    const result = render('before{{#def "x"}}content{{/def}}after', {})
+    expect(result).toBe('beforeafter')
+  })
+
+  test('partial without def throws', () => {
+    expect(() => render('{{> missing}}', {})).toThrow()
+  })
+
 })
