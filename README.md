@@ -41,10 +41,11 @@ Compiles a template string into an AST array. Results are cached unless `cache: 
 Compiles a template directly into a reusable JS function:
 
 ```ts
-import { compileToFunction } from '@nds-stack/bun-html'
+import { compile, compileToFunction } from '@nds-stack/bun-html'
 
-const fn = compileToFunction('Hello {{name}}!')
-fn({ name: 'World' }, undefined, Bun.escapeHTML)
+const ast = compile('Hello {{name}}!')
+const fn = compileToFunction(ast)
+const result = fn({ name: 'World' }, undefined, Bun.escapeHTML)
 // → 'Hello World!'
 ```
 
