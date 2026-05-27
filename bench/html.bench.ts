@@ -40,13 +40,13 @@ function format(n: number): string {
 }
 
 async function bench(fn: () => string | Promise<string>, iterations = 5000): Promise<number> {
-  for (let i = 0; i < 100; i++) fn()
+  for (let i = 0; i < 100; i++) await fn()
 
   const start = performance.now()
   let i: number
   for (i = 0; i < iterations; i++) {
     if (i === 1000 && performance.now() - start > 10000) break
-    fn()
+    await fn()
   }
   const elapsed = performance.now() - start
   return Math.round(i / (elapsed / 1000))
