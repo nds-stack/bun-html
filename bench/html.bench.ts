@@ -53,9 +53,9 @@ async function bench(fn: () => string | Promise<string>, iterations = 5000): Pro
 }
 
 async function main() {
-  const ejsMod = await import('ejs').then(m => m.default).catch(() => null)
-  const hbsMod = await import('handlebars').then(m => m.default).catch(() => null)
-  const mustacheMod = await import('mustache').then(m => m.default).catch(() => null)
+  let ejsMod: any = null; try { ejsMod = (await import('ejs')).default } catch {}
+  let hbsMod: any = null; try { hbsMod = (await import('handlebars')).default } catch {}
+  let mustacheMod: any = null; try { mustacheMod = (await import('mustache')).default } catch {}
 
   const results: Record<string, Record<string, number>> = {}
 

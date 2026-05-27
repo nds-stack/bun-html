@@ -36,7 +36,7 @@ Auto-escaping uses `Bun.escapeHTML()` internally. Async partials read template f
 
 Compiles a template string into an AST array. Results are cached unless `cache: false` is set.
 
-### `compileToFunction(template)`
+### `compileToFunction(ast)`
 
 Compiles a template directly into a reusable JS function:
 
