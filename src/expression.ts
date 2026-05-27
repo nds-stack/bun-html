@@ -47,6 +47,14 @@ export function tokenizeExpr(input: string): ExprToken[] {
       continue
     }
 
+    if (input[i] === '.' && i + 2 < input.length && input[i + 1] === '.' && input[i + 2] === '/') {
+      let j = i + 3
+      while (j < input.length && /[a-zA-Z0-9_$.]/.test(input[j]!)) j++
+      tokens.push({ type: 'Identifier', value: input.slice(i, j) })
+      i = j
+      continue
+    }
+
     const two = input.slice(i, i + 2)
     if (two === '&&') { tokens.push({ type: 'And' }); i += 2; continue }
     if (two === '||') { tokens.push({ type: 'Or' }); i += 2; continue }
@@ -106,7 +114,17 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
         return { type: 'Undefined' }
       case 'Identifier': {
         consume()
-        return { type: 'Identifier', path: token.value!.split('.') }
+        const val = token.value!
+        if (val.startsWith('../')) {
+          let levels = 0
+          let rest = val
+          while (rest.startsWith('../')) { levels++; rest = rest.slice(3) }
+          const parts: string[] = []
+          for (let i = 0; i < levels; i++) parts.push('..')
+          parts.push(...rest.split('.'))
+          return { type: 'Identifier', path: parts }
+        }
+        return { type: 'Identifier', path: val.split('.') }
       }
       case 'ParenOpen':
         consume()

@@ -5,6 +5,7 @@ export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   body.push('let $ = ""')
   body.push('let __d = data')
   body.push('let __h = helpers || {}')
+  body.push('let __s = []')
 
   genNodes(ast, body)
 
@@ -59,15 +60,14 @@ function genNode(node: ASTNode, body: string[]): void {
     }
 
     case 'With': {
-      const path = genSafePath(node.expression)
       body.push(`{`)
-      body.push(`let __prev = __d`)
-      body.push(`let __with = ${path.replace(/^__d/, '__prev')}`)
+      body.push(`__s.push(__d)`)
+      body.push(`let __with = __d${genPropPath(node.expression)}`)
       body.push(`if (__with != null && typeof __with === 'object') {`)
       body.push(`__d = __with`)
       genNodes(node.children, body)
       body.push(`}`)
-      body.push(`__d = __prev`)
+      body.push(`__d = __s.pop()`)
       body.push(`}`)
       break
     }
@@ -100,14 +100,45 @@ function genEach(expression: string, children: ASTNode[], body: string[]): void 
   body.push(`let _entries = Array.isArray(_items) ? _items : Object.values(_items)`)
   body.push(`let _keys = Array.isArray(_items) ? _entries.map((_, _i) => String(_i)) : Object.keys(_items)`)
   body.push(`for (let _i = 0; _i < _entries.length; _i++) {`)
-  body.push(`let __d = _entries[_i]`)
+  body.push(`__s.push(__d)`)
+  body.push(`__d = _entries[_i]`)
   genNodes(children, body)
+  body.push(`__d = __s.pop()`)
   body.push(`}`)
   body.push(`}`)
   body.push(`}`)
 }
 
+function genPropPath(expression: string): string {
+  if (expression === 'this') return ''
+  const parts = expression.split('.')
+  let code = ''
+  for (const part of parts) {
+    code += `?.[${JSON.stringify(part)}]`
+  }
+  return code
+}
+
 function genSafePath(expression: string): string {
+  let rest = expression
+  let levels = 0
+  while (rest.startsWith('../')) {
+    levels++
+    rest = rest.slice(3)
+  }
+
+  if (levels > 0) {
+    if (!rest || rest === 'this') return `__s[Math.max(0, __s.length - ${levels})]`
+    if (rest === '@index') return '_i'
+    if (rest === '@key') return '_keys[_i]'
+    const parts = rest.split('.')
+    let code = `__s[Math.max(0, __s.length - ${levels})]`
+    for (const part of parts) {
+      code += `?.[${JSON.stringify(part)}]`
+    }
+    return code
+  }
+
   if (expression === '@index') return '_i'
   if (expression === '@key') return '_keys[_i]'
   if (expression === 'this') return '__d'
@@ -137,6 +168,19 @@ function genExpr(expr: ExprNode): string {
       if (expr.path.length === 1 && expr.path[0] === '@index') return '_i'
       if (expr.path.length === 1 && expr.path[0] === '@key') return '_keys[_i]'
       if (expr.path.length === 1 && expr.path[0] === 'this') return '__d'
+
+      let levels = 0
+      while (levels < expr.path.length && expr.path[levels] === '..') levels++
+      if (levels > 0) {
+        const rest = expr.path.slice(levels).join('.')
+        if (!rest) return `__s[Math.max(0, __s.length - ${levels})]`
+        const remaining = expr.path.slice(levels)
+        let code = `__s[Math.max(0, __s.length - ${levels})]`
+        for (const part of remaining) {
+          code += `?.[${JSON.stringify(part)}]`
+        }
+        return code
+      }
 
       let code = '__d'
       for (const part of expr.path) {

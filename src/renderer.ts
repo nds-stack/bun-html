@@ -118,17 +118,18 @@ function getConditionValue(
   data: unknown,
   index?: number,
   key?: string,
+  stack?: unknown[],
 ): unknown {
   if (node.exprAst) {
     return evaluateExpr(node.exprAst, data, index, key)
   }
-  return resolveValue(node.expression, data, index, key)
+  return resolveValue(node.expression, data, index, key, stack)
 }
 
 async function renderAsync(ast: ASTNode[], data: unknown, options: RenderOptions): Promise<string> {
   let output = ''
   for (const node of ast) {
-    output += await renderNodeAsync(node, data, options, {})
+    output += await renderNodeAsync(node, data, options, { stack: [data] })
   }
   return output
 }
@@ -137,14 +138,14 @@ async function renderNodeAsync(
   node: ASTNode,
   data: unknown,
   options: RenderOptions,
-  ctx: { index?: number; key?: string },
+  ctx: { index?: number; key?: string; stack?: unknown[] },
 ): Promise<string> {
   switch (node.type) {
     case 'Text':
       return node.value
 
     case 'Variable': {
-      let value = resolveValue(node.expression, data, ctx.index, ctx.key)
+      let value = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (value === undefined) {
         const helper = options.helpers?.[node.expression]
         if (helper) value = helper.call(data)
@@ -155,13 +156,13 @@ async function renderNodeAsync(
     }
 
     case 'RawVariable': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const value = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (value === null || value === undefined) return ''
       return String(value)
     }
 
     case 'Each': {
-      const raw = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const raw = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (!raw || typeof raw !== 'object') return ''
 
       const entries = Array.isArray(raw) ? raw : Object.values(raw)
@@ -171,15 +172,16 @@ async function renderNodeAsync(
 
       let output = ''
       for (let i = 0; i < entries.length; i++) {
+        const newCtx = { index: i, key: keys[i], stack: [...(ctx.stack ?? []), entries[i]] }
         for (const child of node.children) {
-          output += await renderNodeAsync(child, entries[i], options, { index: i, key: keys[i] })
+          output += await renderNodeAsync(child, entries[i], options, newCtx)
         }
       }
       return output
     }
 
     case 'If': {
-      const value = getConditionValue(node, data, ctx.index, ctx.key)
+      const value = getConditionValue(node, data, ctx.index, ctx.key, ctx.stack)
       if (value) {
         let output = ''
         for (const child of node.children) {
@@ -198,7 +200,7 @@ async function renderNodeAsync(
     }
 
     case 'Unless': {
-      const value = getConditionValue(node, data, ctx.index, ctx.key)
+      const value = getConditionValue(node, data, ctx.index, ctx.key, ctx.stack)
       if (!value) {
         let output = ''
         for (const child of node.children) {
@@ -210,11 +212,12 @@ async function renderNodeAsync(
     }
 
     case 'With': {
-      const sub = resolveValue(node.expression, data, ctx.index, ctx.key)
+      const sub = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (sub === null || sub === undefined || typeof sub !== 'object') return ''
       let output = ''
+      const newCtx = { stack: [...(ctx.stack ?? []), sub] }
       for (const child of node.children) {
-        output += await renderNodeAsync(child, sub, options, {})
+        output += await renderNodeAsync(child, sub, options, newCtx)
       }
       return output
     }
@@ -278,7 +281,7 @@ async function renderNodeAsync(
   }
 }
 
-function resolveValue(expression: string, data: unknown, index?: number, key?: string): unknown {
+function resolveValue(expression: string, data: unknown, index?: number, key?: string, stack?: unknown[]): unknown {
   if (expression === '@index') return index
   if (expression === '@key') return key
   if (expression === 'this') return data
@@ -286,8 +289,24 @@ function resolveValue(expression: string, data: unknown, index?: number, key?: s
   if (data === null || data === undefined) return undefined
   if (typeof data !== 'object') return undefined
 
-  const parts = expression.split('.')
-  let value: unknown = data
+  let rest = expression
+  let levels = 0
+  while (rest.startsWith('../')) {
+    levels++
+    rest = rest.slice(3)
+  }
+
+  let value: unknown
+  if (levels > 0) {
+    if (!stack || stack.length < levels) return undefined
+    value = stack[stack.length - levels]
+  } else {
+    value = data
+  }
+
+  if (!rest) return value
+
+  const parts = rest.split('.')
   for (const part of parts) {
     if (!isRecord(value)) return undefined
     value = value[part]

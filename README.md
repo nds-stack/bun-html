@@ -94,6 +94,16 @@ Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
 | `{{@index}}` | Current index (0-based) |
 | `{{@key}}` | Current key (index for arrays, property name for objects) |
 
+**Parent context access:** Inside nested blocks, use `../` to access the parent scope. Multiple levels are supported:
+```handlebars
+{{#each groups}}
+  {{#each items}}
+    {{../../title}} - {{../name}}: {{this}}
+  {{/each}}
+{{/each}}
+```
+One `../` per nesting level. Inside `{{#each groups}}` → `{{../title}}`. Inside nested `{{#each items}}` → `{{../../title}}`.
+
 **Expressions in conditionals:** `{{#if}}` and `{{#unless}}` support full expressions:
 | Operator | Example |
 |----------|---------|
@@ -146,6 +156,7 @@ interface RenderOptions {
 - Partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
 - Expression support limited to conditionals (`{{#if}}`, `{{#unless}}`) — variable interpolation uses simple path resolution
+- `{{../var}}` in conditionals only supports simple parent access, not compound expressions (`../age > 18` works but not `../user.age > 18 && ../active`)
 - Custom delimiters not supported (uses `{{}}` exclusively)
 - No browser build (requires Bun/Node.js runtime)
 
@@ -248,6 +259,7 @@ app.get('/', (c) => {
 | Async partials | ✅ | ❌ | ❌ | ❌ |
 | Layouts | ✅ | ❌ | ❌ | ❌ |
 | Scoped context (`#with`) | ✅ | ✅ | ✅ | ✅ |
+| Parent context (`../var`) | ✅ | ✅ | ✅ | ✅ |
 | Comments | ✅ | ✅ | ❌ | ✅ |
 | Auto-escape | ✅ default | ✅ default | ✅ default | ❌ |
 | Raw output (`{{{}}}`) | ✅ | ✅ | ✅ | N/A |

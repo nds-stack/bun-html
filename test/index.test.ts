@@ -274,4 +274,44 @@ describe('bun-html', () => {
     expect(result).toBe('AB')
   })
 
+  test('parent context {{../var}} inside each', () => {
+    const result = render('{{#each items}}{{../title}}: {{name}},{{/each}}', {
+      title: 'Users',
+      items: [{ name: 'Alice' }, { name: 'Bob' }],
+    })
+    expect(result).toBe('Users: Alice,Users: Bob,')
+  })
+
+  test('parent context {{../var}} inside with', () => {
+    const result = render('{{#with user}}{{../greeting}}, {{name}}!{{/with}}', {
+      greeting: 'Hello',
+      user: { name: 'World' },
+    })
+    expect(result).toBe('Hello, World!')
+  })
+
+  test('parent context {{../../var}} nested each', () => {
+    const result = render('{{#each groups}}{{#each items}}{{../../title}}: {{../name}} - {{this}},{{/each}}{{/each}}', {
+      title: 'List',
+      groups: [{ name: 'Group A', items: ['a1', 'a2'] }],
+    })
+    expect(result).toBe('List: Group A - a1,List: Group A - a2,')
+  })
+
+  test('parent context in {{#if ../cond}}', () => {
+    const result = render('{{#each items}}{{#if ../show}}{{name}}{{/if}}{{/each}}', {
+      show: true,
+      items: [{ name: 'A' }, { name: 'B' }],
+    })
+    expect(result).toBe('AB')
+  })
+
+  test('parent context combined with expression {{#if ../count > 1}}', () => {
+    const result = render('{{#each items}}{{#if ../count > 1}}{{name}}{{/if}}{{/each}}', {
+      count: 2,
+      items: [{ name: 'A' }, { name: 'B' }],
+    })
+    expect(result).toBe('AB')
+  })
+
 })

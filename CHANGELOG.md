@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.0-alpha.2] — 2026-05-27
+
+### Added
+- Parent context access (`{{../var}}`) — supports multiple levels (`{{../../var}}`)
+- `{{../var}}` works in `{{#if}}` expressions with comparisons
+
+### Changed
+- Context tracking now uses `__s` stack for proper multilevel parent resolution
+
 ## [0.1.0-alpha.1] — 2026-05-27
 
 ### Added
