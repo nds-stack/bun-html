@@ -152,7 +152,6 @@ interface RenderOptions {
 
 ## Limitations
 
-- No parent context access (`{{../var}}`) in nested blocks
 - Partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
 - Expression support limited to conditionals (`{{#if}}`, `{{#unless}}`) — variable interpolation uses simple path resolution
