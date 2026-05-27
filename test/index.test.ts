@@ -378,4 +378,49 @@ describe('bun-html', () => {
     expect(result).toBe(' HELLO ')
   })
 
+  test('plugin: helpers are merged', () => {
+    const result = render('{{greet}}', { name: 'World' }, {
+      helpers: { greet(this: unknown) { return `Hi ${(this as Record<string, unknown>).name}` } },
+      plugins: [{
+        name: 'test',
+        helpers: { greet() { return 'overridden' } },
+      }],
+    })
+    // plugin helpers override user helpers
+    expect(result).toBe('overridden')
+  })
+
+  test('plugin: afterRender transforms output', () => {
+    const result = render('Hello {{name}}', { name: 'World' }, {
+      plugins: [{
+        name: 'upper',
+        afterRender(output: string) { return output.toUpperCase() },
+      }],
+    })
+    expect(result).toBe('HELLO WORLD')
+  })
+
+  test('plugin: beforeRender can modify template and data', () => {
+    const result = render('{{greeting}} {{name}}', { name: 'World' }, {
+      plugins: [{
+        name: 'inject',
+        beforeRender(tpl: string, data: Record<string, unknown>) {
+          return { template: tpl.replace('{{greeting}}', 'Hi'), data: { ...data, name: String(data.name).toUpperCase() } }
+        },
+      }],
+    })
+    expect(result).toBe('Hi WORLD')
+  })
+
+  test('plugin: multiple plugins run in order', () => {
+    const calls: string[] = []
+    render('x', {}, {
+      plugins: [
+        { name: 'a', afterRender(o: string) { calls.push('a'); return o } },
+        { name: 'b', afterRender(o: string) { calls.push('b'); return o } },
+      ],
+    })
+    expect(calls).toEqual(['a', 'b'])
+  })
+
 })

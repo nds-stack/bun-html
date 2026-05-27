@@ -35,9 +35,17 @@ export type CompiledTemplate = (
   escapeHTML: (s: string) => string,
 ) => string
 
+export interface Plugin {
+  name: string
+  helpers?: Record<string, (this: unknown, ...args: unknown[]) => unknown>
+  beforeRender?: (template: string, data: Record<string, unknown>, options: RenderOptions) => { template: string; data: Record<string, unknown> }
+  afterRender?: (output: string, data: Record<string, unknown>) => string
+}
+
 export interface RenderOptions {
   partialsDir?: string
   cache?: boolean
   autoescape?: boolean
   helpers?: Record<string, (this: unknown, ...args: unknown[]) => unknown>
+  plugins?: Plugin[]
 }

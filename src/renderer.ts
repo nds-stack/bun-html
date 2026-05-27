@@ -90,28 +90,54 @@ export function render(
 ): string | Promise<string> {
   const opts: RenderOptions = options ?? {}
 
+  const plugins = opts.plugins ?? []
+  let mergedHelpers = opts.helpers
+  let tpl = template
+  let dt = data
+
+  for (const plugin of plugins) {
+    if (plugin.helpers) {
+      mergedHelpers = { ...mergedHelpers, ...plugin.helpers }
+    }
+    if (plugin.beforeRender) {
+      const result = plugin.beforeRender(tpl, dt, opts)
+      tpl = result.template
+      dt = result.data
+    }
+  }
+
   if (opts.partialsDir) {
-    const ast = compile(template, opts)
-    return renderAsync(ast, data, opts)
+    const ast = compile(tpl, opts)
+    return renderAsync(ast, dt, opts).then((output: string) => {
+      for (const plugin of plugins) {
+        if (plugin.afterRender) output = plugin.afterRender(output, dt)
+      }
+      return output
+    })
   }
 
   const doCache = opts.cache !== false
   let fn: CompiledTemplate | undefined
 
   if (doCache) {
-    fn = compiledCache.get(template)
+    fn = compiledCache.get(tpl)
     if (!fn) {
-      const ast = parse(tokenize(template))
+      const ast = parse(tokenize(tpl))
       fn = compileToFunction(ast)
-      compiledCache.set(template, fn)
+      compiledCache.set(tpl, fn)
     }
   } else {
-    const ast = parse(tokenize(template))
+    const ast = parse(tokenize(tpl))
     fn = compileToFunction(ast)
   }
 
   const esc = opts.autoescape !== false ? Bun.escapeHTML : (s: string): string => s
-  return fn(data, opts.helpers, esc)
+  let output = fn(dt, mergedHelpers, esc)
+
+  for (const plugin of plugins) {
+    if (plugin.afterRender) output = plugin.afterRender(output, dt)
+  }
+  return output
 }
 
 function getConditionValue(

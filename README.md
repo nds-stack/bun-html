@@ -150,6 +150,7 @@ interface RenderOptions {
   cache?: boolean             // Cache compiled templates (default true)
   autoescape?: boolean        // Auto-escape {{var}} (default true)
   helpers?: Record<string, (this: unknown, ...args: unknown[]) => unknown>
+  plugins?: Plugin[]          // Plugins with beforeRender, afterRender, helpers
 }
 ```
 
@@ -236,6 +237,30 @@ render('{{#def "item"}}<li>{{name}}</li>{{/def}}{{#each items}}{{> item}}{{/each
   items: [{ name: 'A' }, { name: 'B' }],
 })
 // → '<li>A</li><li>B</li>'
+```
+
+### Plugins
+
+```ts
+const uppercasePlugin = {
+  name: 'uppercase',
+  afterRender(output: string) { return output.toUpperCase() },
+}
+
+render('Hello {{name}}', { name: 'World' }, { plugins: [uppercasePlugin] })
+// → 'HELLO WORLD'
+```
+
+Plugins can also provide helpers and transform data before rendering:
+
+```ts
+const plugin = {
+  name: 'inject',
+  helpers: { greet() { return 'Hi' } },
+  beforeRender(tpl: string, data: Record<string, unknown>) {
+    return { template: tpl, data: { ...data, extra: '!' } }
+  },
+}
 ```
 
 ## Framework Adapters

@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-alpha.6] — 2026-05-27
+
+### Added
+- Plugin system: `beforeRender`, `afterRender` hooks and plugin helper merging
+- `plugins` option in `RenderOptions`
+- Plugin helpers override user helpers for same key
+- Multiple plugins run in order (FIFO)
+
 ## [0.1.0-alpha.5] — 2026-05-27
 
 ### Fixed
