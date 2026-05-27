@@ -36,6 +36,41 @@ Auto-escaping uses `Bun.escapeHTML()` internally. Async partials read template f
 
 Compiles a template string into an AST array. Results are cached unless `cache: false` is set.
 
+### `compileToFunction(template)`
+
+Compiles a template directly into a reusable JS function:
+
+```ts
+import { compileToFunction } from '@nds-stack/bun-html'
+
+const fn = compileToFunction('Hello {{name}}!')
+fn({ name: 'World' }, undefined, Bun.escapeHTML)
+// → 'Hello World!'
+```
+
+### `clearCache()` / `purgeTemplate(template)`
+
+```ts
+import { clearCache, purgeTemplate } from '@nds-stack/bun-html'
+
+purgeTemplate('Hello {{name}}')  // Remove single template from cache
+clearCache()                      // Clear all caches (templates + partials + compiled)
+```
+
+### `adapter`
+
+```ts
+import { adapter } from '@nds-stack/bun-html'
+
+// Express — returns (filePath, data, callback) for app.engine()
+adapter.express({ dir: './views' })
+
+// Hono — returns middleware that adds c.var.render()
+adapter.hono({ dir: './views' })
+```
+
+See [Framework Adapters](#framework-adapters) for full usage.
+
 ### Template Tags
 
 | Tag | Description |
@@ -52,6 +87,22 @@ Compiles a template string into an AST array. Results are cached unless `cache: 
 
 Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
 
+**Loop context:** Inside `{{#each}}`, the following variables are available:
+| Variable | Description |
+|----------|-------------|
+| `{{this}}` | The current item |
+| `{{@index}}` | Current index (0-based) |
+| `{{@key}}` | Current key (index for arrays, property name for objects) |
+
+**Expressions in conditionals:** `{{#if}}` and `{{#unless}}` support full expressions:
+| Operator | Example |
+|----------|---------|
+| Comparison | `>`, `<`, `>=`, `<=`, `==`, `!=` |
+| Logical | `&&`, `\|\|`, `!` |
+| Parentheses | `(age > 18) && (role == "admin")` |
+| Literals | Numbers (`18`), strings (`"admin"`), booleans (`true`/`false`), `null`, `undefined` |
+| Property access | `user.age`, `items.length` |
+
 **Whitespace control:** Add `~` inside mustache delimiters to strip adjacent whitespace:
 | Syntax | Description |
 |--------|-------------|
@@ -60,6 +111,14 @@ Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
 | `{{~tag~}}` | Strip both sides |
 | `{{{~raw~}}}` | Same for raw `{{{}}}` tags |
 | `{{~#if~}}`, `{{~/if~}}` | Strip around block open/close tags |
+
+```ts
+render('item = {{~val~}} end', { val: 'x' })
+// → 'item = xend'     (whitespace around val stripped)
+
+render('{{~#each items~}}\n  {{this}}\n{{~/each~}}', { items: ['a', 'b'] })
+// → 'ab'               (newlines and indentation stripped)
+```
 
 ### RenderOptions
 
