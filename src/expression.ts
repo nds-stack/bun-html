@@ -1,5 +1,4 @@
 import type { ExprNode } from './types.js'
-import { validateKey } from './types.js'
 
 export function formatPosition(obj?: { line?: number; column?: number }): string {
   if (obj?.line !== undefined && obj?.column !== undefined) {
@@ -65,8 +64,7 @@ export function tokenizeExpr(input: string): ExprToken[] {
     if (input[i] === '.' && i + 2 < input.length && input[i + 1] === '.' && input[i + 2] === '/') {
       let j = i + 3
       while (j < input.length && /[a-zA-Z0-9_$./]/.test(input[j]!)) j++
-      const word = input.slice(i, j)
-      tokens.push({ type: 'Identifier', value: word })
+      tokens.push({ type: 'Identifier', value: input.slice(i, j) })
       i = j
       continue
     }
@@ -101,9 +99,7 @@ export function tokenizeExpr(input: string): ExprToken[] {
 function parseTokens(tokens: ExprToken[]): ExprNode {
   let pos = 0
 
-  function peek(): ExprToken | undefined {
-    return tokens[pos]
-  }
+  function peek(): ExprToken | undefined { return tokens[pos] }
 
   function consume(type?: ExprTokenType): ExprToken {
     const token = tokens[pos]
@@ -120,21 +116,11 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     if (!token) throw new Error('Unexpected end of expression')
 
     switch (token.type) {
-      case 'Number':
-        consume()
-        return { type: 'Number', value: Number(token.value!) }
-      case 'String':
-        consume()
-        return { type: 'String', value: token.value! }
-      case 'Boolean':
-        consume()
-        return { type: 'Boolean', value: token.value === 'true' }
-      case 'Null':
-        consume()
-        return { type: 'Null' }
-      case 'Undefined':
-        consume()
-        return { type: 'Undefined' }
+      case 'Number': consume(); return { type: 'Number', value: Number(token.value!) }
+      case 'String': consume(); return { type: 'String', value: token.value! }
+      case 'Boolean': consume(); return { type: 'Boolean', value: token.value === 'true' }
+      case 'Null': consume(); return { type: 'Null' }
+      case 'Undefined': consume(); return { type: 'Undefined' }
       case 'Identifier': {
         consume()
         const val = token.value!
@@ -166,10 +152,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
       const args: ExprNode[] = []
       if (peek()?.type !== 'ParenClose') {
         args.push(parseExpr())
-        while (peek()?.type === 'Comma') {
-          consume('Comma')
-          args.push(parseExpr())
-        }
+        while (peek()?.type === 'Comma') { consume('Comma'); args.push(parseExpr()) }
       }
       consume('ParenClose')
       node = { type: 'CallExpression', callee: node, args }
@@ -178,14 +161,8 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
   }
 
   function parseUnary(): ExprNode {
-    if (peek()?.type === 'Not') {
-      consume()
-      return { type: 'UnaryNot', operand: parseUnary() }
-    }
-    if (peek()?.type === 'Minus') {
-      consume()
-      return { type: 'UnaryMinus', operand: parseUnary() }
-    }
+    if (peek()?.type === 'Not') { consume(); return { type: 'UnaryNot', operand: parseUnary() } }
+    if (peek()?.type === 'Minus') { consume(); return { type: 'UnaryMinus', operand: parseUnary() } }
     return parseCall()
   }
 
@@ -194,8 +171,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     while (peek()?.type === 'Star' || peek()?.type === 'Slash') {
       const token = consume()
       const op = token.type === 'Star' ? '*' : '/'
-      const right = parseUnary()
-      left = { type: 'BinaryOp', op, left, right }
+      left = { type: 'BinaryOp', op, left, right: parseUnary() }
     }
     return left
   }
@@ -205,8 +181,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     while (peek()?.type === 'Plus' || peek()?.type === 'Minus') {
       const token = consume()
       const op = token.type === 'Plus' ? '+' : '-'
-      const right = parseMultiplicative()
-      left = { type: 'BinaryOp', op, left, right }
+      left = { type: 'BinaryOp', op, left, right: parseMultiplicative() }
     }
     return left
   }
@@ -219,30 +194,20 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
       const opMap: Record<string, '>' | '<' | '>=' | '<=' | '==' | '!='> = {
         Gt: '>', Lt: '<', Gte: '>=', Lte: '<=', Eq: '==', Neq: '!=',
       }
-      const op = opMap[token.type]!
-      const right = parseAdditive()
-      left = { type: 'BinaryOp', op, left, right }
+      left = { type: 'BinaryOp', op: opMap[token.type]!, left, right: parseAdditive() }
     }
     return left
   }
 
   function parseAnd(): ExprNode {
     let left = parseComparison()
-    while (peek()?.type === 'And') {
-      consume()
-      const right = parseComparison()
-      left = { type: 'BinaryOp', op: '&&', left, right }
-    }
+    while (peek()?.type === 'And') { consume(); left = { type: 'BinaryOp', op: '&&', left, right: parseComparison() } }
     return left
   }
 
   function parseOr(): ExprNode {
     let left = parseAnd()
-    while (peek()?.type === 'Or') {
-      consume()
-      const right = parseAnd()
-      left = { type: 'BinaryOp', op: '||', left, right }
-    }
+    while (peek()?.type === 'Or') { consume(); left = { type: 'BinaryOp', op: '||', left, right: parseAnd() } }
     return left
   }
 
@@ -258,107 +223,15 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     return condition
   }
 
-  function parseExpr(): ExprNode {
-    return parseTernary()
-  }
+  function parseExpr(): ExprNode { return parseTernary() }
 
   const result = parseExpr()
-  if (pos < tokens.length) {
-    throw new Error(`Unexpected token after expression: ${tokens[pos]!.type}`)
-  }
+  if (pos < tokens.length) throw new Error(`Unexpected token after expression: ${tokens[pos]!.type}`)
   return result
 }
 
 export function parseExpression(input: string): ExprNode {
   const trimmed = input.trim()
   if (!trimmed) throw new Error('Empty expression')
-  const exTokens = tokenizeExpr(trimmed)
-  return parseTokens(exTokens)
-}
-
-export function evaluateExpr(
-  node: ExprNode,
-  data: unknown,
-  index?: number,
-  key?: string,
-  stack?: unknown[],
-): unknown {
-  switch (node.type) {
-    case 'Number':
-    case 'String':
-    case 'Boolean':
-      return node.value
-    case 'Null':
-      return null
-    case 'Undefined':
-      return undefined
-    case 'Identifier': {
-      if (node.path.length === 0) return undefined
-
-      let levels = 0
-      while (levels < node.path.length && node.path[levels] === '..') levels++
-
-      let value: unknown
-      if (levels > 0) {
-        if (!stack || stack.length < levels) return undefined
-        value = stack[stack.length - levels]
-      } else {
-        value = data
-      }
-
-      const parts = node.path.slice(levels)
-      for (const part of parts) {
-        if (part === '@index') { value = index; break }
-        if (part === '@key') { value = key; break }
-        if (part === 'this') continue
-        validateKey(part)
-        if (value === null || value === undefined) return undefined
-        value = (value as any)?.[part]
-      }
-      return value
-    }
-    case 'UnaryNot': {
-      return !evaluateExpr(node.operand, data, index, key, stack)
-    }
-    case 'UnaryMinus': {
-      const val = evaluateExpr(node.operand, data, index, key, stack)
-      return -Number(val)
-    }
-    case 'BinaryOp': {
-      if (node.op === '&&') {
-        const left = evaluateExpr(node.left, data, index, key, stack)
-        if (!left) return left
-        return evaluateExpr(node.right, data, index, key, stack)
-      }
-      if (node.op === '||') {
-        const left = evaluateExpr(node.left, data, index, key, stack)
-        if (left) return left
-        return evaluateExpr(node.right, data, index, key, stack)
-      }
-      const left = evaluateExpr(node.left, data, index, key, stack)
-      const right = evaluateExpr(node.right, data, index, key, stack)
-      switch (node.op) {
-        case '>': return Number(left) > Number(right)
-        case '<': return Number(left) < Number(right)
-        case '>=': return Number(left) >= Number(right)
-        case '<=': return Number(left) <= Number(right)
-        case '==': return left == right
-        case '!=': return left != right
-        case '+': return Number(left) + Number(right)
-        case '-': return Number(left) - Number(right)
-        case '*': return Number(left) * Number(right)
-        case '/': return Number(left) / Number(right)
-      }
-    }
-    case 'CallExpression': {
-      const callee = evaluateExpr(node.callee, data, index, key, stack)
-      if (typeof callee !== 'function') return undefined
-      const args = node.args.map(a => evaluateExpr(a, data, index, key, stack))
-      return callee(...args)
-    }
-    case 'Ternary': {
-      const cond = evaluateExpr(node.condition, data, index, key, stack)
-      return cond ? evaluateExpr(node.then, data, index, key, stack) : evaluateExpr(node.else, data, index, key, stack)
-    }
-  }
+  return parseTokens(tokenizeExpr(trimmed))
 }
