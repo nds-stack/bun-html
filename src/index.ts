@@ -1,4 +1,4 @@
-export { render, compile } from './renderer.js'
+export { render, compile, clearCache, purgeTemplate } from './renderer.js'
 export type { Token, ASTNode, RenderOptions } from './types.js'
 export type {
   ASTNodeText,

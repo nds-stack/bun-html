@@ -2,8 +2,57 @@ import type { ASTNode, RenderOptions } from './types.js'
 import { tokenize } from './lexer.js'
 import { parse } from './parser.js'
 
-const templateCache = new Map<string, ASTNode[]>()
-const partialCache = new Map<string, ASTNode[]>()
+const DEFAULT_CACHE_SIZE = 100
+
+class BoundedCache<K, V> {
+  private max: number
+  private map: Map<K, V>
+
+  constructor(max: number = DEFAULT_CACHE_SIZE) {
+    this.max = max
+    this.map = new Map()
+  }
+
+  get(key: K): V | undefined {
+    return this.map.get(key)
+  }
+
+  set(key: K, value: V): void {
+    if (this.map.size >= this.max) {
+      const first = this.map.keys().next().value
+      if (first !== undefined) this.map.delete(first as unknown as K)
+    }
+    this.map.set(key, value)
+  }
+
+  delete(key: K): boolean {
+    return this.map.delete(key)
+  }
+
+  clear(): void {
+    this.map.clear()
+  }
+
+  get size(): number {
+    return this.map.size
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+const templateCache = new BoundedCache<string, ASTNode[]>()
+const partialCache = new BoundedCache<string, ASTNode[]>()
+
+export function clearCache(): void {
+  templateCache.clear()
+  partialCache.clear()
+}
+
+export function purgeTemplate(template: string): boolean {
+  return templateCache.delete(template)
+}
 
 export function compile(template: string, options?: RenderOptions): ASTNode[] {
   const doCache = options?.cache !== false
@@ -258,8 +307,8 @@ async function renderNodeAsync(
         partialCache.set(cacheKey, layoutAst)
       }
 
-      const layoutData = typeof data === 'object' && data !== null
-        ? { ...(data as Record<string, unknown>), content }
+      const layoutData = isRecord(data)
+        ? { ...data, content }
         : { this: data, content }
 
       let output = ''
@@ -282,9 +331,8 @@ function resolveValue(expression: string, data: unknown, index?: number, key?: s
   const parts = expression.split('.')
   let value: unknown = data
   for (const part of parts) {
-    if (value === null || value === undefined) return undefined
-    if (typeof value !== 'object') return undefined
-    value = (value as Record<string, unknown>)[part]
+    if (!isRecord(value)) return undefined
+    value = value[part]
   }
   return value
 }
