@@ -45,7 +45,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function validatePartialName(name: string): void {
-  if (/\.\.|[\\\/]/.test(name)) {
+  if (!name || /\.\.|[\\\/]/.test(name)) {
     throw new Error(`Invalid partial/layout name: "${name}"`)
   }
 }

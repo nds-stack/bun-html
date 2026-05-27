@@ -23,7 +23,11 @@ export function tokenizeExpr(input: string): ExprToken[] {
     if (input[i] === "'" || input[i] === '"') {
       const quote = input[i]!
       let j = i + 1
-      while (j < input.length && input[j] !== quote) j++
+      while (j < input.length) {
+        if (input[j] === '\\' && j + 1 < input.length) { j += 2; continue }
+        if (input[j] === quote) break
+        j++
+      }
       tokens.push({ type: 'String', value: input.slice(i + 1, j) })
       i = j + 1
       continue
@@ -342,7 +346,7 @@ export function evaluateExpr(
       const callee = evaluateExpr(node.callee, data, index, key, stack)
       if (typeof callee !== 'function') return undefined
       const args = node.args.map(a => evaluateExpr(a, data, index, key, stack))
-      return callee.apply(null, args)
+      return callee(...args)
     }
     case 'Ternary': {
       const cond = evaluateExpr(node.condition, data, index, key, stack)

@@ -89,7 +89,7 @@ function genNode(node: ASTNode, body: string[]): void {
       body.push(`if (typeof __pfn === 'function') {`)
       body.push(`$ += __pfn()`)
       body.push(`} else {`)
-      body.push(`throw new Error('Partial "${node.name}" not found. Define it via {{#def "${node.name}"}}...{{/def}} or set partialsDir.')`)
+      body.push(`throw new Error('Partial ' + ${JSON.stringify(node.name)} + ' not found. Define it via {{#def "' + ${JSON.stringify(node.name)} + '"}}...{{/def}} or set partialsDir.')`)
       body.push(`}`)
       body.push(`}`)
       break
@@ -222,9 +222,6 @@ function genExpr(expr: ExprNode): string {
     case 'CallExpression': {
       const callee = genExpr(expr.callee)
       const args = expr.args.map(a => genExpr(a)).join(', ')
-      if (expr.callee.type === 'Identifier') {
-        return `${callee}?.(${args})`
-      }
       return `${callee}?.(${args})`
     }
     case 'Ternary':
