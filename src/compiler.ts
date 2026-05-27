@@ -1,9 +1,17 @@
-import type { ASTNode, ExprNode, CompiledTemplate } from './types.js'
+import type { ASTNode, ASTNodeVariable, ASTNodeRawVariable, ExprNode, CompiledTemplate, PipeFilter } from './types.js'
 import { validateKey } from './types.js'
 import { parseExpression } from './expression.js'
 
+export interface SourceMapEntry {
+  generatedLine: number
+  sourceLine: number
+  sourceColumn: number
+}
+
 export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   const body: string[] = []
+  const sourceMap: SourceMapEntry[] = []
+
   body.push('let $ = ""')
   body.push('let __d = data')
   body.push('let __h = helpers || {}')
@@ -11,45 +19,62 @@ export function compileToFunction(ast: ASTNode[]): CompiledTemplate {
   body.push('let __defs = {}')
   body.push('let __depth = 0')
 
-  genNodes(ast, body)
+  genNodes(ast, body, sourceMap)
 
   body.push('return $')
 
   const code = body.join('\n')
-  return new Function('data', 'helpers', 'escapeHTML', code) as CompiledTemplate
+  const fn = new Function('data', 'helpers', 'escapeHTML', code) as CompiledTemplate
+  ;(fn as unknown as Record<string, unknown>).__sourceMap = sourceMap
+  return fn
 }
 
-function genNodes(nodes: ASTNode[], body: string[]): void {
+function genNodes(nodes: ASTNode[], body: string[], sourceMap: SourceMapEntry[]): void {
   for (const node of nodes) {
-    genNode(node, body)
+    genNode(node, body, sourceMap)
   }
 }
 
-function genNode(node: ASTNode, body: string[]): void {
+function recordSource(node: ASTNode, body: string[], sourceMap: SourceMapEntry[]): void {
+  if (node.source) {
+    sourceMap.push({
+      generatedLine: body.length,
+      sourceLine: node.source.line,
+      sourceColumn: node.source.column,
+    })
+  }
+}
+
+function genNode(node: ASTNode, body: string[], sourceMap: SourceMapEntry[]): void {
+  recordSource(node, body, sourceMap)
   switch (node.type) {
     case 'Text':
       body.push(`$ += ${JSON.stringify(node.value)}`)
       break
 
     case 'Variable':
-      genVariable(node.expression, true, body)
+      genVariable(node, true, body)
       break
 
     case 'RawVariable':
-      genVariable(node.expression, false, body)
+      genVariable(node, false, body)
       break
 
     case 'Each':
-      genEach(node.expression, node.children, body)
+      if (node.exprAst) {
+        genEachExpr(node.exprAst, node.children, body, sourceMap)
+      } else {
+        genEachPath(node.expression, node.children, body, sourceMap)
+      }
       break
 
     case 'If': {
       const condCode = node.exprAst ? genExpr(node.exprAst) : `${genSafePath(node.expression)}`
       body.push(`if (${condCode}) {`)
-      genNodes(node.children, body)
+      genNodes(node.children, body, sourceMap)
       if (node.elseChildren.length > 0) {
         body.push(`} else {`)
-        genNodes(node.elseChildren, body)
+        genNodes(node.elseChildren, body, sourceMap)
       }
       body.push(`}`)
       break
@@ -58,18 +83,19 @@ function genNode(node: ASTNode, body: string[]): void {
     case 'Unless': {
       const condCode = node.exprAst ? genExpr(node.exprAst) : `${genSafePath(node.expression)}`
       body.push(`if (!(${condCode})) {`)
-      genNodes(node.children, body)
+      genNodes(node.children, body, sourceMap)
       body.push(`}`)
       break
     }
 
     case 'With': {
+      const target = node.exprAst ? genExpr(node.exprAst) : `__d${genPropPath(node.expression)}`
       body.push(`{`)
       body.push(`__s.push(__d)`)
-      body.push(`let __with = __d${genPropPath(node.expression)}`)
+      body.push(`let __with = ${target}`)
       body.push(`if (__with != null && typeof __with === 'object') {`)
       body.push(`__d = __with`)
-      genNodes(node.children, body)
+      genNodes(node.children, body, sourceMap)
       body.push(`}`)
       body.push(`__d = __s.pop()`)
       body.push(`}`)
@@ -81,7 +107,7 @@ function genNode(node: ASTNode, body: string[]): void {
       subBody.push('let $ = ""')
       subBody.push('let __depth = $__depth + 1')
       subBody.push('if (__depth > 50) throw new Error("Partial recursion too deep (>50)")')
-      genNodes(node.children, subBody)
+      genNodes(node.children, subBody, [])
       subBody.push('return $')
       body.push(`__defs[${JSON.stringify(node.name)}] = function($__depth) {\n${subBody.join('\n')}\n}`)
       break
@@ -104,25 +130,45 @@ function genNode(node: ASTNode, body: string[]): void {
   }
 }
 
-function genVariable(expression: string, escape: boolean, body: string[]): void {
+function genVariable(node: ASTNodeVariable | ASTNodeRawVariable, escape: boolean, body: string[]): void {
   let exprCode: string
-  try {
-    const exprAst = parseExpression(expression)
-    exprCode = genExpr(exprAst)
-  } catch {
-    exprCode = genSafePath(expression)
+  if (node.exprAst) {
+    exprCode = genExpr(node.exprAst)
+  } else {
+    try {
+      const exprAst = parseExpression(node.expression)
+      exprCode = genExpr(exprAst)
+    } catch {
+      exprCode = genSafePath(node.expression)
+    }
   }
   body.push(`{`)
   body.push(`let _v = ${exprCode}`)
+  if (node.filters && node.filters.length > 0) {
+    body.push(`if (_v != null) {`)
+    for (const filter of node.filters) {
+      const fnCode = generateFilterCall(filter)
+      body.push(`_v = ${fnCode}`)
+    }
+    body.push(`}`)
+  }
   body.push(`if (_v === void 0) {`)
-  body.push(`let _hf = __h[${JSON.stringify(expression)}]`)
+  body.push(`let _hf = __h[${JSON.stringify(node.expression)}]`)
   body.push(`if (typeof _hf === 'function') _v = _hf.call(__d)`)
   body.push(`}`)
   body.push(`if (_v != null) $ += ${escape ? 'escapeHTML(String(_v))' : 'String(_v)'}`)
   body.push(`}`)
 }
 
-function genEach(expression: string, children: ASTNode[], body: string[]): void {
+function generateFilterCall(filter: PipeFilter): string {
+  if (filter.args.length === 0) {
+    return `typeof __h[${JSON.stringify(filter.name)}] === 'function' ? __h[${JSON.stringify(filter.name)}].call(_v) : _v`
+  }
+  const argsStr = filter.args.map(a => typeof a === 'string' ? JSON.stringify(a) : String(a)).join(', ')
+  return `typeof __h[${JSON.stringify(filter.name)}] === 'function' ? __h[${JSON.stringify(filter.name)}].call(_v, ${argsStr}) : _v`
+}
+
+function genEachPath(expression: string, children: ASTNode[], body: string[], sourceMap: SourceMapEntry[]): void {
   const items = genSafePath(expression)
   body.push(`{`)
   body.push(`let _items = ${items}`)
@@ -132,7 +178,23 @@ function genEach(expression: string, children: ASTNode[], body: string[]): void 
   body.push(`for (let _i = 0; _i < _entries.length; _i++) {`)
   body.push(`__s.push(__d)`)
   body.push(`__d = _entries[_i]`)
-  genNodes(children, body)
+  genNodes(children, body, sourceMap)
+  body.push(`__d = __s.pop()`)
+  body.push(`}`)
+  body.push(`}`)
+  body.push(`}`)
+}
+
+function genEachExpr(expr: ExprNode, children: ASTNode[], body: string[], sourceMap: SourceMapEntry[]): void {
+  body.push(`{`)
+  body.push(`let _items = ${genExpr(expr)}`)
+  body.push(`if (_items && typeof _items === 'object') {`)
+  body.push(`let _entries = Array.isArray(_items) ? _items : Object.values(_items)`)
+  body.push(`let _keys = Array.isArray(_items) ? _entries.map((_, _i) => String(_i)) : Object.keys(_items)`)
+  body.push(`for (let _i = 0; _i < _entries.length; _i++) {`)
+  body.push(`__s.push(__d)`)
+  body.push(`__d = _entries[_i]`)
+  genNodes(children, body, sourceMap)
   body.push(`__d = __s.pop()`)
   body.push(`}`)
   body.push(`}`)
@@ -225,6 +287,7 @@ function genExpr(expr: ExprNode): string {
     case 'UnaryMinus':
       return `(-(${genExpr(expr.operand)}))`
     case 'BinaryOp':
+      if (expr.op === '??') return `(${genExpr(expr.left)} ?? ${genExpr(expr.right)})`
       return `(${genExpr(expr.left)} ${expr.op} ${genExpr(expr.right)})`
     case 'CallExpression': {
       const callee = genExpr(expr.callee)
@@ -233,5 +296,13 @@ function genExpr(expr: ExprNode): string {
     }
     case 'Ternary':
       return `(${genExpr(expr.condition)} ? ${genExpr(expr.then)} : ${genExpr(expr.else)})`
+    case 'ArrayLiteral': {
+      const elems = expr.elements.map(e => genExpr(e)).join(', ')
+      return `[${elems}]`
+    }
+    case 'ObjectLiteral': {
+      const pairs = expr.entries.map(e => `${JSON.stringify(e.key)}: ${genExpr(e.value)}`).join(', ')
+      return `{${pairs}}`
+    }
   }
 }

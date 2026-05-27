@@ -13,7 +13,8 @@ export type ExprTokenType =
   | 'Not' | 'And' | 'Or'
   | 'Plus' | 'Minus' | 'Star' | 'Slash'
   | 'Gt' | 'Lt' | 'Gte' | 'Lte' | 'Eq' | 'Neq'
-  | 'Question' | 'Colon'
+  | 'Question' | 'Colon' | 'DoubleQuestion'
+  | 'BracketOpen' | 'BracketClose' | 'BraceOpen' | 'BraceClose'
 
 export interface ExprToken {
   type: ExprTokenType
@@ -71,6 +72,7 @@ export function tokenizeExpr(input: string): ExprToken[] {
     }
 
     const two = input.slice(i, i + 2)
+    if (two === '??') { tokens.push({ type: 'DoubleQuestion' }); i += 2; continue }
     if (two === '&&') { tokens.push({ type: 'And' }); i += 2; continue }
     if (two === '||') { tokens.push({ type: 'Or' }); i += 2; continue }
     if (two === '>=') { tokens.push({ type: 'Gte' }); i += 2; continue }
@@ -80,6 +82,10 @@ export function tokenizeExpr(input: string): ExprToken[] {
 
     if (input[i] === '(') { tokens.push({ type: 'ParenOpen' }); i++; continue }
     if (input[i] === ')') { tokens.push({ type: 'ParenClose' }); i++; continue }
+    if (input[i] === '[') { tokens.push({ type: 'BracketOpen' }); i++; continue }
+    if (input[i] === ']') { tokens.push({ type: 'BracketClose' }); i++; continue }
+    if (input[i] === '{') { tokens.push({ type: 'BraceOpen' }); i++; continue }
+    if (input[i] === '}') { tokens.push({ type: 'BraceClose' }); i++; continue }
     if (input[i] === ',') { tokens.push({ type: 'Comma' }); i++; continue }
     if (input[i] === '>') { tokens.push({ type: 'Gt' }); i++; continue }
     if (input[i] === '<') { tokens.push({ type: 'Lt' }); i++; continue }
@@ -141,9 +147,43 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
         const expr = parseExpr()
         consume('ParenClose')
         return expr
+      case 'BracketOpen': {
+        consume()
+        const elements: ExprNode[] = []
+        if (peek()?.type !== 'BracketClose') {
+          elements.push(parseExpr())
+          while (peek()?.type === 'Comma') { consume('Comma'); elements.push(parseExpr()) }
+        }
+        consume('BracketClose')
+        return { type: 'ArrayLiteral', elements }
+      }
+      case 'BraceOpen': {
+        consume()
+        const entries: { key: string; value: ExprNode }[] = []
+        if (peek()?.type !== 'BraceClose') {
+          parseObjectPair(entries)
+          while (peek()?.type === 'Comma') { consume('Comma'); parseObjectPair(entries) }
+        }
+        consume('BraceClose')
+        return { type: 'ObjectLiteral', entries }
+      }
       default:
         throw new Error(`Unexpected token: ${token.type}`)
     }
+  }
+
+  function parseObjectPair(entries: { key: string; value: ExprNode }[]): void {
+    const tok = peek()
+    if (!tok) throw new Error('Expected object key')
+    if (tok.type === 'String' || tok.type === 'Identifier') {
+      const key = tok.value ?? ''
+      consume()
+      consume('Colon')
+      const value = parseExpr()
+      entries.push({ key, value })
+      return
+    }
+    throw new Error(`Expected string or identifier as object key, got ${tok.type}`)
   }
 
   function parseCall(): ExprNode {
@@ -212,8 +252,14 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
     return left
   }
 
+  function parseNullish(): ExprNode {
+    let left = parseOr()
+    if (peek()?.type === 'DoubleQuestion') { consume(); left = { type: 'BinaryOp', op: '??', left, right: parseOr() } }
+    return left
+  }
+
   function parseTernary(): ExprNode {
-    const condition = parseOr()
+    const condition = parseNullish()
     if (peek()?.type === 'Question') {
       consume('Question')
       const then = parseExpr()

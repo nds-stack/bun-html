@@ -7,9 +7,11 @@ export type ExprNode =
   | { type: 'Undefined' }
   | { type: 'UnaryNot'; operand: ExprNode }
   | { type: 'UnaryMinus'; operand: ExprNode }
-  | { type: 'BinaryOp'; op: '&&' | '||' | '>' | '<' | '>=' | '<=' | '==' | '!=' | '+' | '-' | '*' | '/'; left: ExprNode; right: ExprNode }
+  | { type: 'BinaryOp'; op: '&&' | '||' | '??' | '>' | '<' | '>=' | '<=' | '==' | '!=' | '+' | '-' | '*' | '/'; left: ExprNode; right: ExprNode }
   | { type: 'CallExpression'; callee: ExprNode; args: ExprNode[] }
   | { type: 'Ternary'; condition: ExprNode; then: ExprNode; else: ExprNode }
+  | { type: 'ArrayLiteral'; elements: ExprNode[] }
+  | { type: 'ObjectLiteral'; entries: { key: string; value: ExprNode }[] }
 
 export interface Token {
   type: 'Text' | 'Variable' | 'RawVariable' | 'EachOpen' | 'EachClose' | 'IfOpen' | 'IfClose' | 'Else' | 'UnlessOpen' | 'UnlessClose' | 'WithOpen' | 'WithClose' | 'DefOpen' | 'DefClose' | 'Partial' | 'LayoutOpen' | 'LayoutClose'
@@ -31,16 +33,26 @@ export function validateKey(key: string): void {
   }
 }
 
-export interface ASTNodeText { type: 'Text'; value: string }
-export interface ASTNodeVariable { type: 'Variable'; expression: string }
-export interface ASTNodeRawVariable { type: 'RawVariable'; expression: string }
-export interface ASTNodeEach { type: 'Each'; expression: string; children: ASTNode[] }
-export interface ASTNodeIf { type: 'If'; expression: string; exprAst?: ExprNode; children: ASTNode[]; elseChildren: ASTNode[] }
-export interface ASTNodeUnless { type: 'Unless'; expression: string; exprAst?: ExprNode; children: ASTNode[] }
-export interface ASTNodeWith { type: 'With'; expression: string; children: ASTNode[] }
-export interface ASTNodePartialDef { type: 'PartialDef'; name: string; children: ASTNode[] }
-export interface ASTNodePartial { type: 'Partial'; name: string }
-export interface ASTNodeLayout { type: 'Layout'; name: string; children: ASTNode[] }
+export interface PipeFilter {
+  name: string
+  args: unknown[]
+}
+
+export interface SourcePosition {
+  line: number
+  column: number
+}
+
+export interface ASTNodeText { type: 'Text'; value: string; source?: SourcePosition }
+export interface ASTNodeVariable { type: 'Variable'; expression: string; exprAst?: ExprNode; filters?: PipeFilter[]; source?: SourcePosition }
+export interface ASTNodeRawVariable { type: 'RawVariable'; expression: string; exprAst?: ExprNode; filters?: PipeFilter[]; source?: SourcePosition }
+export interface ASTNodeEach { type: 'Each'; expression: string; exprAst?: ExprNode; children: ASTNode[]; source?: SourcePosition }
+export interface ASTNodeIf { type: 'If'; expression: string; exprAst?: ExprNode; children: ASTNode[]; elseChildren: ASTNode[]; source?: SourcePosition }
+export interface ASTNodeUnless { type: 'Unless'; expression: string; exprAst?: ExprNode; children: ASTNode[]; source?: SourcePosition }
+export interface ASTNodeWith { type: 'With'; expression: string; exprAst?: ExprNode; children: ASTNode[]; source?: SourcePosition }
+export interface ASTNodePartialDef { type: 'PartialDef'; name: string; children: ASTNode[]; source?: SourcePosition }
+export interface ASTNodePartial { type: 'Partial'; name: string; source?: SourcePosition }
+export interface ASTNodeLayout { type: 'Layout'; name: string; children: ASTNode[]; source?: SourcePosition }
 
 export type ASTNode = ASTNodeText | ASTNodeVariable | ASTNodeRawVariable | ASTNodeEach | ASTNodeIf | ASTNodeUnless | ASTNodeWith | ASTNodePartialDef | ASTNodePartial | ASTNodeLayout
 

@@ -3,7 +3,7 @@ import { tokenize } from './lexer.js'
 import { parse } from './parser.js'
 import { compileToFunction } from './compiler.js'
 import { renderAsync } from './runtime.js'
-import { BoundedCache } from './cache.js'
+import { BoundedCache, type CacheStats } from './cache.js'
 
 const MAX_TEMPLATE_LENGTH = 1_000_000
 const NO_ESCAPE = (s: string): string => s
@@ -20,6 +20,13 @@ export function purgeTemplate(template: string): boolean {
   const a = templateCache.delete(template)
   const b = compiledCache.delete(template)
   return a || b
+}
+
+export function getCacheStats(): { template: CacheStats; compiled: CacheStats } {
+  return {
+    template: templateCache.stats,
+    compiled: compiledCache.stats,
+  }
 }
 
 export function compile(template: string, options?: RenderOptions): ASTNode[] {

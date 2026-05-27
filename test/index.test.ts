@@ -353,6 +353,131 @@ describe('bun-html', () => {
     expect(render('{{age >= 18 ? "adult" : "minor"}}', { age: 15 })).toBe('minor')
   })
 
+  test('expression: nullish coalescing returns right when left is null', () => {
+    expect(render('{{name ?? "default"}}', { name: null })).toBe('default')
+  })
+
+  test('expression: nullish coalescing returns left when not null', () => {
+    expect(render('{{name ?? "default"}}', { name: 'Alice' })).toBe('Alice')
+  })
+
+  test('expression: nullish coalescing returns right when left is missing', () => {
+    expect(render('{{missing ?? "N/A"}}', {})).toBe('N/A')
+  })
+
+  test('expression: nullish coalescing returns right when left is undefined', () => {
+    expect(render('{{x ?? "fallback"}}', { x: undefined })).toBe('fallback')
+  })
+
+  test('expression: nullish coalescing returns falsy but defined value (0)', () => {
+    expect(render('{{score ?? 10}}', { score: 0 })).toBe('0')
+  })
+
+  test('expression: nullish coalescing returns falsy but defined value (empty string)', () => {
+    expect(render('{{name ?? "anon"}}', { name: '' })).toBe('')
+  })
+
+  test('expression: nullish coalescing in conditional', () => {
+    expect(render('{{#if (count ?? 5) > 3}}yes{{/if}}', {})).toBe('yes')
+  })
+
+  test('expression: array literal', () => {
+    const result = render('{{[1, 2, 3]}}', {})
+    expect(result).toBe('1,2,3')
+  })
+
+  test('expression: array literal with variable references', () => {
+    const result = render('{{[a, b, c]}}', { a: 10, b: 20, c: 30 })
+    expect(result).toBe('10,20,30')
+  })
+
+  test('expression: empty array', () => {
+    const result = render('{{[]}}', {})
+    expect(result).toBe('')
+  })
+
+  test('expression: array literal in each', () => {
+    const result = render('{{#each [10, 20, 30]}}{{this}},{{/each}}', {})
+    expect(result).toBe('10,20,30,')
+  })
+
+  test('expression: object literal parses without error', () => {
+    expect(() => render('{{ {name: "Alice"} }}', {})).not.toThrow()
+  })
+
+  test('pipe filter: single filter', () => {
+    const result = render('{{name | uppercase}}', { name: 'hello' }, {
+      helpers: { uppercase(this: unknown) { return String(this).toUpperCase() } },
+    })
+    expect(result).toBe('HELLO')
+  })
+
+  test('pipe filter: chained filters', () => {
+    const result = render('{{name | trim | uppercase}}', { name: ' hello ' }, {
+      helpers: {
+        trim(this: unknown) { return String(this).trim() },
+        uppercase(this: unknown) { return String(this).toUpperCase() },
+      },
+    })
+    expect(result).toBe('HELLO')
+  })
+
+  test('pipe filter: filter with arguments', () => {
+    const result = render('{{name | truncate:5}}', { name: 'hello world' }, {
+      helpers: {
+        truncate(this: unknown, len: number) { return String(this).slice(0, len) },
+      } as Record<string, (this: unknown, ...args: unknown[]) => unknown>,
+    })
+    expect(result).toBe('hello')
+  })
+
+  test('pipe filter: filter with multiple args', () => {
+    const result = render('{{text | pad:4,"x"}}', { text: 'hi' }, {
+      helpers: {
+        pad(this: unknown, len: number, char: string) { return String(this).padEnd(len, char) },
+      } as Record<string, (this: unknown, ...args: unknown[]) => unknown>,
+    })
+    expect(result).toBe('hixx')
+  })
+
+  test('pipe filter: missing filter returns value unchanged', () => {
+    const result = render('{{name | missing_filter}}', { name: 'value' })
+    expect(result).toBe('value')
+  })
+
+  test('pipe filter with expression value', () => {
+    const result = render('{{name.toUpperCase() | lower}}', { name: 'Hello' }, {
+      helpers: {
+        lower(this: unknown) { return String(this).toLowerCase() },
+      },
+    })
+    expect(result).toBe('hello')
+  })
+
+  test('pipe filter: filter name matches registered helper', () => {
+    let count = 0
+    const result = render('{{name | shout}}', { name: 'hey' }, {
+      helpers: {
+        shout(this: unknown) { count++; return String(this).toUpperCase() + '!' },
+      },
+    })
+    expect(result).toBe('HEY!')
+    expect(count).toBe(1)
+  })
+
+  test('compileToFunction attaches source map', () => {
+    const { compileToFunction } = require('../src/index.js')
+    const { compile } = require('../src/index.js')
+    const ast = compile('{{name}}')
+    const fn = compileToFunction(ast)
+    const map = (fn as unknown as Record<string, unknown>).__sourceMap as { generatedLine: number; sourceLine: number; sourceColumn: number }[]
+    expect(Array.isArray(map)).toBe(true)
+    expect(map.length).toBeGreaterThan(0)
+    expect(map[0]!).toHaveProperty('generatedLine')
+    expect(map[0]!).toHaveProperty('sourceLine')
+    expect(map[0]!).toHaveProperty('sourceColumn')
+  })
+
   test('variable expression: nested function call on object', () => {
     const result = render('{{user.name.toUpperCase()}}', { user: { name: 'alice' } })
     expect(result).toBe('ALICE')
@@ -477,6 +602,79 @@ describe('bun-html', () => {
     expect(hit).toBe(true)
     const miss = purgeTemplate('never-cached')
     expect(miss).toBe(false)
+    clearCache()
+  })
+
+  test('BoundedCache TTL evicts expired entries', () => {
+    const { BoundedCache } = require('../src/index.js')
+    const cache = new BoundedCache(10, 50)
+    cache.set('k1', 'v1')
+    expect(cache.get('k1')).toBe('v1')
+    Bun.sleepSync(60)
+    expect(cache.get('k1')).toBeUndefined()
+  })
+
+  test('BoundedCache per-entry TTL override', () => {
+    const { BoundedCache } = require('../src/index.js')
+    const cache = new BoundedCache(10, 1000)
+    cache.set('live', 'l', 10000)
+    cache.set('short', 's', 10)
+    Bun.sleepSync(20)
+    expect(cache.get('short')).toBeUndefined()
+    expect(cache.get('live')).toBe('l')
+  })
+
+  test('BoundedCache memory estimation via stats', () => {
+    const { BoundedCache } = require('../src/index.js')
+    const cache = new BoundedCache(5)
+    cache.set('a', 'hello world')
+    cache.set('b', { x: 1, y: 2 })
+    const stats = cache.stats
+    expect(stats.size).toBe(2)
+    expect(stats.capacity).toBe(5)
+    expect(stats.memoryBytes).toBeGreaterThan(0)
+    expect(typeof stats.memoryMB).toBe('string')
+    expect(Number(stats.memoryMB)).toBeGreaterThanOrEqual(0)
+  })
+
+  test('BoundedCache hit/miss/eviction stats', () => {
+    const { BoundedCache } = require('../src/index.js')
+    const cache = new BoundedCache(2)
+    cache.get('never')
+    cache.set('a', 1)
+    cache.get('a')
+    cache.set('b', 2)
+    cache.set('c', 3)
+    const stats = cache.stats
+    expect(stats.hits).toBe(1)
+    expect(stats.misses).toBe(1)
+    expect(stats.evictions).toBe(1)
+    expect(stats.size).toBe(2)
+  })
+
+  test('BoundedCache purge removes only expired', () => {
+    const { BoundedCache } = require('../src/index.js')
+    const cache = new BoundedCache(10)
+    cache.set('fresh', 'f')
+    cache.set('stale', 's', 1)
+    Bun.sleepSync(10)
+    const purged = cache.purge()
+    expect(purged).toBe(1)
+    expect(cache.get('fresh')).toBe('f')
+    expect(cache.get('stale')).toBeUndefined()
+  })
+
+  test('getCacheStats exposes template and compiled cache info', () => {
+    const { render, getCacheStats, clearCache } = require('../src/index.js')
+    clearCache()
+    render('{{x}}', { x: 1 })
+    const stats = getCacheStats()
+    expect(stats.template.size).toBeGreaterThanOrEqual(1)
+    expect(stats.compiled.size).toBeGreaterThanOrEqual(1)
+    expect(stats.compiled.hits).toBe(0)
+    render('{{x}}', { x: 2 })
+    const stats2 = getCacheStats()
+    expect(stats2.compiled.hits).toBeGreaterThanOrEqual(1)
     clearCache()
   })
 

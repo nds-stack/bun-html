@@ -1,7 +1,9 @@
-export { render, renderStream, compile, clearCache, purgeTemplate } from './renderer.js'
-export { compileToFunction } from './compiler.js'
+export { render, renderStream, compile, clearCache, purgeTemplate, getCacheStats } from './renderer.js'
+export { compileToFunction, type SourceMapEntry } from './compiler.js'
 export * as adapter from './adapters/index.js'
 export type { Token, ASTNode, RenderOptions, CompiledTemplate, ExprNode, Plugin } from './types.js'
+export type { CacheStats } from './cache.js'
+export { BoundedCache } from './cache.js'
 export type {
   ASTNodeText,
   ASTNodeVariable,

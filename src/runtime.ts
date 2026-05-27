@@ -1,4 +1,4 @@
-import type { ASTNode, ASTNodeIf, ASTNodeUnless, RenderOptions } from './types.js'
+import type { ASTNode, ASTNodeIf, ASTNodeUnless, ASTNodeVariable, ASTNodeRawVariable, PipeFilter, RenderOptions } from './types.js'
 import { evaluateExpr } from './evaluator.js'
 import { validateKey } from './types.js'
 import { tokenize } from './lexer.js'
@@ -19,6 +19,25 @@ function validatePartialName(name: string): void {
   if (!name || /\.\.|[\\\/]/.test(name)) {
     throw new Error(`Invalid partial/layout name: "${name}"`)
   }
+}
+
+function resolveOrEval(
+  node: ASTNodeVariable | ASTNodeRawVariable,
+  data: unknown,
+  index?: number,
+  key?: string,
+  stack?: unknown[],
+): unknown {
+  if (node.exprAst) {
+    return evaluateExpr(node.exprAst, data, index, key, stack)
+  }
+  return resolveValue(node.expression, data, index, key, stack)
+}
+
+function applyFilter(filter: PipeFilter, value: unknown, options: RenderOptions): unknown {
+  const fn = options.helpers?.[filter.name]
+  if (typeof fn !== 'function') return value
+  return fn.call(value, ...filter.args)
 }
 
 function getConditionValue(
@@ -53,8 +72,13 @@ async function renderNodeAsync(
       return node.value
 
     case 'Variable': {
-      let value = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
-      if (value === undefined) {
+      let value = resolveOrEval(node, data, ctx.index, ctx.key, ctx.stack)
+      if (node.filters && node.filters.length > 0 && value != null) {
+        for (const filter of node.filters) {
+          value = applyFilter(filter, value, options)
+        }
+      }
+      if (value === undefined && !node.exprAst) {
         const helper = options.helpers?.[node.expression]
         if (helper) value = helper.call(data)
       }
@@ -64,13 +88,20 @@ async function renderNodeAsync(
     }
 
     case 'RawVariable': {
-      const value = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
+      let value = resolveOrEval(node, data, ctx.index, ctx.key, ctx.stack)
+      if (node.filters && node.filters.length > 0 && value != null) {
+        for (const filter of node.filters) {
+          value = applyFilter(filter, value, options)
+        }
+      }
       if (value === null || value === undefined) return ''
       return String(value)
     }
 
     case 'Each': {
-      const raw = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
+      const raw = node.exprAst
+        ? evaluateExpr(node.exprAst, data, ctx.index, ctx.key, ctx.stack)
+        : resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (!raw || typeof raw !== 'object') return ''
 
       const entries = Object.values(raw)
@@ -120,7 +151,9 @@ async function renderNodeAsync(
     }
 
     case 'With': {
-      const sub = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
+      const sub = node.exprAst
+        ? evaluateExpr(node.exprAst, data, ctx.index, ctx.key, ctx.stack)
+        : resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (sub === null || sub === undefined || typeof sub !== 'object') return ''
       let output = ''
       const newCtx = { stack: [...(ctx.stack ?? []), data], defs: ctx.defs }

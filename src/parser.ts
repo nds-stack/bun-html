@@ -1,4 +1,4 @@
-import type { Token, ASTNode } from './types.js'
+import type { Token, ASTNode, ExprNode, SourcePosition } from './types.js'
 import { parseExpression, formatPosition } from './expression.js'
 
 export function parse(tokens: Token[]): ASTNode[] {
@@ -23,18 +23,75 @@ function pos(token: Token): string {
   return formatPosition(token)
 }
 
+function tryParseExpression(expression: string): ExprNode | undefined {
+  try {
+    if (expression.trim()) {
+      return parseExpression(expression)
+    }
+  } catch {
+  }
+  return undefined
+}
+
+function parsePipeFilters(input: string): { base: string; filters: { name: string; args: unknown[] }[] } | undefined {
+  const parts = input.split('|')
+  if (parts.length < 2) return undefined
+
+  const base = parts.shift()!.trim()
+  const filters: { name: string; args: unknown[] }[] = []
+
+  for (const raw of parts) {
+    const trimmed = raw.trim()
+    const colonIdx = trimmed.indexOf(':')
+    if (colonIdx === -1) {
+      filters.push({ name: trimmed, args: [] })
+    } else {
+      const name = trimmed.slice(0, colonIdx).trim()
+      const argsStr = trimmed.slice(colonIdx + 1).trim()
+      const args = argsStr ? argsStr.split(',').map(s => {
+        const t = s.trim()
+        if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+          return t.slice(1, -1)
+        }
+        const n = Number(t)
+        if (!isNaN(n) && t.length > 0) return n
+        return t
+      }) : []
+      filters.push({ name, args })
+    }
+  }
+
+  return { base, filters }
+}
+
+function makeVariableNode(type: 'Variable' | 'RawVariable', expression: string): ASTNode {
+  const pipeResult = parsePipeFilters(expression)
+  if (pipeResult) {
+    const exprAst = tryParseExpression(pipeResult.base)
+    return { type, expression, exprAst, filters: pipeResult.filters }
+  }
+  const exprAst = tryParseExpression(expression)
+  return { type, expression, exprAst }
+}
+
+function sourcePos(token: Token): SourcePosition | undefined {
+  return token.line !== undefined && token.column !== undefined
+    ? { line: token.line, column: token.column }
+    : undefined
+}
+
 function parseNode(tokens: Token[], i: number): ParseResult {
   const token = tokens[i]!
 
   switch (token.type) {
     case 'Text':
-      return { node: { type: 'Text', value: token.value! }, nextIndex: i + 1 }
+      return { node: { type: 'Text', value: token.value!, source: sourcePos(token) }, nextIndex: i + 1 }
 
     case 'Variable':
-      return { node: { type: 'Variable', expression: token.value! }, nextIndex: i + 1 }
+      return { node: { ...makeVariableNode('Variable', token.value!), source: sourcePos(token) }, nextIndex: i + 1 }
 
     case 'RawVariable':
-      return { node: { type: 'RawVariable', expression: token.value! }, nextIndex: i + 1 }
+      return { node: { ...makeVariableNode('RawVariable', token.value!), source: sourcePos(token) }, nextIndex: i + 1 }
 
     case 'EachOpen':
       return parseEach(tokens, i)
@@ -67,7 +124,7 @@ function parseNode(tokens: Token[], i: number): ParseResult {
       throw new Error(`Unexpected {{/def}}${pos(token)}`)
 
     case 'Partial':
-      return { node: { type: 'Partial', name: token.value! }, nextIndex: i + 1 }
+      return { node: { type: 'Partial', name: token.value!, source: sourcePos(token) }, nextIndex: i + 1 }
 
     case 'Else':
       throw new Error(`Unexpected {{else}}${pos(token)}`)
@@ -103,6 +160,7 @@ function parseChildren(
 }
 
 function parseEach(tokens: Token[], i: number): ParseResult {
+  const srcPos = sourcePos(tokens[i]!)
   const expression = tokens[i]!.value!
   if (!expression.trim()) throw new Error(`{{#each}} requires an expression${pos(tokens[i]!)}`)
   i++
@@ -115,10 +173,11 @@ function parseEach(tokens: Token[], i: number): ParseResult {
   }
   i++
 
-  return { node: { type: 'Each', expression, children }, nextIndex: i }
+  return { node: { type: 'Each', expression, exprAst: tryParseExpression(expression), children, source: srcPos }, nextIndex: i }
 }
 
 function parseIf(tokens: Token[], i: number): ParseResult {
+  const srcPos = sourcePos(tokens[i]!)
   const expression = tokens[i]!.value!
   if (!expression.trim()) throw new Error(`{{#if}} requires an expression${pos(tokens[i]!)}`)
   i++
@@ -149,10 +208,11 @@ function parseIf(tokens: Token[], i: number): ParseResult {
     throw new Error(`Invalid expression in {{#if}}: "${expression}"${pos(tokens[i - 1]!)} — ${(e as Error).message}`)
   }
 
-  return { node: { type: 'If', expression, exprAst, children: thenChildren, elseChildren }, nextIndex: i }
+  return { node: { type: 'If', expression, exprAst, children: thenChildren, elseChildren, source: srcPos }, nextIndex: i }
 }
 
 function parseUnless(tokens: Token[], i: number): ParseResult {
+  const srcPos = sourcePos(tokens[i]!)
   const expression = tokens[i]!.value!
   if (!expression.trim()) throw new Error(`{{#unless}} requires an expression${pos(tokens[i]!)}`)
   i++
@@ -174,10 +234,11 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
     throw new Error(`Invalid expression in {{#unless}}: "${expression}"${pos(tokens[i - 1]!)} — ${(e as Error).message}`)
   }
 
-  return { node: { type: 'Unless', expression, exprAst, children }, nextIndex: i }
+  return { node: { type: 'Unless', expression, exprAst, children, source: srcPos }, nextIndex: i }
 }
 
 function parseWith(tokens: Token[], i: number): ParseResult {
+  const srcPos = sourcePos(tokens[i]!)
   const expression = tokens[i]!.value!
   if (!expression.trim()) throw new Error(`{{#with}} requires an expression${pos(tokens[i]!)}`)
   i++
@@ -190,10 +251,11 @@ function parseWith(tokens: Token[], i: number): ParseResult {
   }
   i++
 
-  return { node: { type: 'With', expression, children }, nextIndex: i }
+  return { node: { type: 'With', expression, exprAst: tryParseExpression(expression), children, source: srcPos }, nextIndex: i }
 }
 
 function parseDef(tokens: Token[], i: number): ParseResult {
+  const srcPos = sourcePos(tokens[i]!)
   const name = tokens[i]!.value!
   i++
 
@@ -205,10 +267,11 @@ function parseDef(tokens: Token[], i: number): ParseResult {
   }
   i++
 
-  return { node: { type: 'PartialDef', name, children }, nextIndex: i }
+  return { node: { type: 'PartialDef', name, children, source: srcPos }, nextIndex: i }
 }
 
 function parseLayout(tokens: Token[], i: number): ParseResult {
+  const srcPos = sourcePos(tokens[i]!)
   const name = tokens[i]!.value!
   i++
 
@@ -220,5 +283,5 @@ function parseLayout(tokens: Token[], i: number): ParseResult {
   }
   i++
 
-  return { node: { type: 'Layout', name, children }, nextIndex: i }
+  return { node: { type: 'Layout', name, children, source: srcPos }, nextIndex: i }
 }

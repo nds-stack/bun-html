@@ -60,6 +60,11 @@ export function evaluateExpr(
         if (left) return left
         return evaluateExpr(node.right, data, index, key, stack)
       }
+      if (node.op === '??') {
+        const left = evaluateExpr(node.left, data, index, key, stack)
+        if (left !== null && left !== undefined) return left
+        return evaluateExpr(node.right, data, index, key, stack)
+      }
       const left = evaluateExpr(node.left, data, index, key, stack)
       const right = evaluateExpr(node.right, data, index, key, stack)
       switch (node.op) {
@@ -85,6 +90,16 @@ export function evaluateExpr(
     case 'Ternary': {
       const cond = evaluateExpr(node.condition, data, index, key, stack)
       return cond ? evaluateExpr(node.then, data, index, key, stack) : evaluateExpr(node.else, data, index, key, stack)
+    }
+    case 'ArrayLiteral': {
+      return node.elements.map(e => evaluateExpr(e, data, index, key, stack))
+    }
+    case 'ObjectLiteral': {
+      const obj: Record<string, unknown> = {}
+      for (const entry of node.entries) {
+        obj[entry.key] = evaluateExpr(entry.value, data, index, key, stack)
+      }
+      return obj
     }
     default: {
       const _: never = node
