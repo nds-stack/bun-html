@@ -98,6 +98,7 @@ function parseChildren(
 
 function parseEach(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
+  if (!expression.trim()) throw new Error('{{#each}} requires an expression')
   i++
 
   const { children, nextIndex } = parseChildren(tokens, i, 'EachClose')
@@ -113,6 +114,7 @@ function parseEach(tokens: Token[], i: number): ParseResult {
 
 function parseIf(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
+  if (!expression.trim()) throw new Error('{{#if}} requires an expression')
   i++
 
   const { children: thenChildren, nextIndex: afterThen } = parseChildren(tokens, i, 'IfClose')
@@ -146,6 +148,7 @@ function parseIf(tokens: Token[], i: number): ParseResult {
 
 function parseUnless(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
+  if (!expression.trim()) throw new Error('{{#unless}} requires an expression')
   i++
 
   const { children, nextIndex } = parseChildren(tokens, i, 'UnlessClose')
@@ -170,6 +173,7 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
 
 function parseWith(tokens: Token[], i: number): ParseResult {
   const expression = tokens[i]!.value!
+  if (!expression.trim()) throw new Error('{{#with}} requires an expression')
   i++
 
   const { children, nextIndex } = parseChildren(tokens, i, 'WithClose')

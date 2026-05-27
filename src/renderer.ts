@@ -141,7 +141,7 @@ export function render(
     fn = compileToFunction(ast)
   }
 
-  const esc = opts.autoescape !== false ? Bun.escapeHTML : (s: string): string => s
+  const esc = opts.autoescape !== false ? Bun.escapeHTML : NO_ESCAPE
   let output = fn(dt, mergedHelpers, esc)
 
   for (const plugin of plugins) {
@@ -151,6 +151,7 @@ export function render(
 }
 
 const encoder = new TextEncoder()
+const NO_ESCAPE = (s: string): string => s
 
 export function renderStream(
   template: string,
@@ -376,6 +377,7 @@ async function renderNodeAsync(
 }
 
 function resolveValue(expression: string, data: unknown, index?: number, key?: string, stack?: unknown[]): unknown {
+  if (!expression) return undefined
   if (expression === '@index') return index
   if (expression === '@key') return key
   if (expression === 'this') return data
