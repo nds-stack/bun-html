@@ -13,9 +13,10 @@ const html = render('<h1>Hello {{name}}!</h1>', { name: 'World' })
 
 ## How It Works
 
-1. **Lexer** — Tokenizes the template string into structured tokens (Text, Variable, Each, If, Unless, Partial, Layout)
+1. **Lexer** — Tokenizes the template string into structured tokens (Text, Variable, Each, If, Unless, With, Partial, Layout)
 2. **Parser** — Recursive descent parser builds an AST from the token stream
-3. **Renderer** — Walks the AST, resolves variables from the data context, produces output
+3. **Compiler** — Generates a JS function via `new Function()` for raw speed
+4. **Renderer** — Executes the compiled function with the data context
 
 Auto-escaping uses `Bun.escapeHTML()` internally. Async partials read template files via `Bun.file()` with built-in caching.
 
@@ -44,6 +45,8 @@ Compiles a template string into an AST array. Results are cached unless `cache: 
 | `{{#each items}}...{{/each}}` | Loop — context: `{{this}}`, `{{@index}}`, `{{@key}}` |
 | `{{#if cond}}...{{else}}...{{/if}}` | Conditional — supports expressions: `{{#if age > 18}}` |
 | `{{#unless cond}}...{{/unless}}` | Inverse conditional — supports expressions |
+| `{{#with key}}...{{/with}}` | Scoped context — changes `__d` to `key` within the block |
+| `{{! comment }}` | Comment — stripped entirely from output |
 | `{{> partialName}}` | Partial (async, loaded via `Bun.file()`) |
 | `{{#layout "name"}}...{{/layout}}` | Layout wrapper (content available as `{{content}}`) |
 
@@ -84,6 +87,8 @@ interface RenderOptions {
 - Partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
 - Expression support limited to conditionals (`{{#if}}`, `{{#unless}}`) — variable interpolation uses simple path resolution
+- Custom delimiters not supported (uses `{{}}` exclusively)
+- No browser build (requires Bun/Node.js runtime)
 
 ## Multi-Instance / Cross-Boundary
 
@@ -132,6 +137,49 @@ await render('{{#layout "main"}}{{content}}{{/layout}}', data, {
 // layouts/main.html: <html><body>{{content}}</body></html>
 ```
 
+### {{#with}}
+```ts
+render('{{#with user}}<h1>{{name}}</h1>{{/with}}', { user: { name: 'Alice' } })
+// → '<h1>Alice</h1>'
+```
+
+### Comments
+```ts
+render('Hello{{! this is a comment }}World', {})
+// → 'HelloWorld'
+```
+
+## Framework Adapters
+
+### Express
+
+```ts
+import { adapter } from '@nds-stack/bun-html'
+
+app.engine('html', adapter.express({ dir: './views' }))
+app.set('view engine', 'html')
+
+app.get('/', (req, res) => {
+  res.render('index', { title: 'Hello' })
+  // renders ./views/index.html
+})
+```
+
+### Hono
+
+```ts
+import { Hono } from 'hono'
+import { adapter } from '@nds-stack/bun-html'
+
+const app = new Hono()
+
+app.use('*', adapter.hono({ dir: './views' }))
+
+app.get('/', (c) => {
+  return c.html(c.var.render('<h1>{{title}}</h1>', { title: 'Hello' }))
+})
+```
+
 ## Comparison Table
 
 | Feature | bun-html | mustache | handlebars | ejs |
@@ -140,6 +188,8 @@ await render('{{#layout "main"}}{{content}}{{/layout}}', data, {
 | Bun-native (Bun.escapeHTML, Bun.file) | ✅ | ❌ | ❌ | ❌ |
 | Async partials | ✅ | ❌ | ❌ | ❌ |
 | Layouts | ✅ | ❌ | ❌ | ❌ |
+| Scoped context (`#with`) | ✅ | ✅ | ✅ | ✅ |
+| Comments | ✅ | ✅ | ❌ | ✅ |
 | Auto-escape | ✅ default | ✅ default | ✅ default | ❌ |
 | Raw output (`{{{}}}`) | ✅ | ✅ | ✅ | N/A |
 | Loops | ✅ | ✅ | ✅ | ✅ |
@@ -179,7 +229,7 @@ const template = `
 {{#each users}}
   <li>
     <span>{{name}}</span>
-    {{#if admin}}
+    {{#if role == "admin"}}
       <strong>ADMIN</strong>
     {{else}}
       <em>user</em>
@@ -190,5 +240,5 @@ const template = `
 `
 
 const html = render(template, { users })
-// Works with Bun.serve() for SSR
+// <ul><li><span>Alice</span><strong>ADMIN</strong></li><li><span>Bob</span><em>user</em></li></ul>
 ```

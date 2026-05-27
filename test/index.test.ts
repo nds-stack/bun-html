@@ -225,4 +225,53 @@ describe('bun-html', () => {
     expect(render('{{#if items.length}}has items{{/if}}', { items: [1, 2] })).toBe('has items')
   })
 
+  test('comment {{! ... }} is stripped', () => {
+    expect(render('Hello{{! comment }}World', {})).toBe('HelloWorld')
+  })
+
+  test('comment with multiple lines', () => {
+    expect(render('a{{! multi\nline }}b', {})).toBe('ab')
+  })
+
+  test('comment does not affect surrounding whitespace', () => {
+    expect(render('a {{! note }} b', {})).toBe('a  b')
+  })
+
+  test('{{#with}} scopes data context', () => {
+    const result = render('{{#with user}}{{name}}{{/with}}', { user: { name: 'Alice' } })
+    expect(result).toBe('Alice')
+  })
+
+  test('{{#with}} nested', () => {
+    const result = render('{{#with a}}{{#with b}}{{name}}{{/with}}{{/with}}', {
+      a: { b: { name: 'deep' } },
+    })
+    expect(result).toBe('deep')
+  })
+
+  test('{{#with}} on non-object renders nothing', () => {
+    expect(render('{{#with missing}}x{{/with}}', {})).toBe('')
+  })
+
+  test('adapter.express returns renderFile function', async () => {
+    const { adapter } = await import('../src/index.js')
+    const eng = adapter.express({ dir: './views' })
+    expect(typeof eng).toBe('function')
+    expect(eng.length).toBe(3)
+  })
+
+  test('adapter.hono returns middleware function', async () => {
+    const { adapter } = await import('../src/index.js')
+    const mw = adapter.hono()
+    expect(typeof mw).toBe('function')
+    expect(mw.length).toBe(2)
+  })
+
+  test('{{#with}} inside {{#each}}', () => {
+    const result = render('{{#each items}}{{#with this}}{{name}}{{/with}}{{/each}}', {
+      items: [{ name: 'A' }, { name: 'B' }],
+    })
+    expect(result).toBe('AB')
+  })
+
 })

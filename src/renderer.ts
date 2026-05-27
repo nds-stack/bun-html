@@ -209,6 +209,16 @@ async function renderNodeAsync(
       return ''
     }
 
+    case 'With': {
+      const sub = resolveValue(node.expression, data, ctx.index, ctx.key)
+      if (sub === null || sub === undefined || typeof sub !== 'object') return ''
+      let output = ''
+      for (const child of node.children) {
+        output += await renderNodeAsync(child, sub, options, {})
+      }
+      return output
+    }
+
     case 'Partial': {
       const dir = options.partialsDir
       if (!dir) throw new Error('Partials require partialsDir option')

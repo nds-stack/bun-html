@@ -50,6 +50,12 @@ function parseNode(tokens: Token[], i: number): ParseResult {
     case 'UnlessClose':
       throw new Error('Unexpected {{/unless}}')
 
+    case 'WithOpen':
+      return parseWith(tokens, i)
+
+    case 'WithClose':
+      throw new Error('Unexpected {{/with}}')
+
     case 'Partial':
       return { node: { type: 'Partial', name: token.value! }, nextIndex: i + 1 }
 
@@ -154,6 +160,21 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
   }
 
   return { node: { type: 'Unless', expression, exprAst, children }, nextIndex: i }
+}
+
+function parseWith(tokens: Token[], i: number): ParseResult {
+  const expression = tokens[i]!.value!
+  i++
+
+  const { children, nextIndex } = parseChildren(tokens, i, 'WithClose')
+  i = nextIndex
+
+  if (i >= tokens.length) {
+    throw new Error('Unclosed {{#with}}')
+  }
+  i++
+
+  return { node: { type: 'With', expression, children }, nextIndex: i }
 }
 
 function parseLayout(tokens: Token[], i: number): ParseResult {

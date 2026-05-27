@@ -58,6 +58,20 @@ function genNode(node: ASTNode, body: string[]): void {
       break
     }
 
+    case 'With': {
+      const path = genSafePath(node.expression)
+      body.push(`{`)
+      body.push(`let __prev = __d`)
+      body.push(`let __with = ${path.replace(/^__d/, '__prev')}`)
+      body.push(`if (__with != null && typeof __with === 'object') {`)
+      body.push(`__d = __with`)
+      genNodes(node.children, body)
+      body.push(`}`)
+      body.push(`__d = __prev`)
+      body.push(`}`)
+      break
+    }
+
     case 'Partial':
       throw new Error('Partials require partialsDir option')
 

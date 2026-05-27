@@ -5,12 +5,13 @@ export function tokenize(template: string): Token[] {
   let lastIndex = 0
   let pendingStripAfter = false
 
+  const cleaned = template.replace(/\{\{![\s\S]*?\}\}/g, '')
   const re = /\{\{\{(\~?)([\s\S]*?)(\~?)\}\}\}|\{\{(\~?)([\s\S]*?)(\~?)\}\}/g
 
   let match: RegExpExecArray | null
-  while ((match = re.exec(template)) !== null) {
+  while ((match = re.exec(cleaned)) !== null) {
     if (match.index > lastIndex) {
-      let text = template.slice(lastIndex, match.index)
+      let text = cleaned.slice(lastIndex, match.index)
       if (pendingStripAfter) {
         text = text.replace(/^\s+/, '')
         pendingStripAfter = false
@@ -46,6 +47,8 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'IfClose' })
     } else if (content === '/unless') {
       tokens.push({ type: 'UnlessClose' })
+    } else if (content === '/with') {
+      tokens.push({ type: 'WithClose' })
     } else if (content === '/layout') {
       tokens.push({ type: 'LayoutClose' })
     } else if (/^#each(?:\s+|$)/.test(content)) {
@@ -54,6 +57,8 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'IfOpen', value: content.replace(/^#if\s*/, '').trim() })
     } else if (/^#unless(?:\s+|$)/.test(content)) {
       tokens.push({ type: 'UnlessOpen', value: content.replace(/^#unless\s*/, '').trim() })
+    } else if (/^#with(?:\s+|$)/.test(content)) {
+      tokens.push({ type: 'WithOpen', value: content.replace(/^#with\s*/, '').trim() })
     } else if (/^#layout(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#layout\s*/, '').trim().replace(/^"|"$/g, '')
       tokens.push({ type: 'LayoutOpen', value: name })
@@ -72,8 +77,8 @@ export function tokenize(template: string): Token[] {
     lastIndex = re.lastIndex
   }
 
-  if (lastIndex < template.length) {
-    let text = template.slice(lastIndex)
+  if (lastIndex < cleaned.length) {
+    let text = cleaned.slice(lastIndex)
     if (pendingStripAfter) {
       text = text.replace(/^\s+/, '')
     }
