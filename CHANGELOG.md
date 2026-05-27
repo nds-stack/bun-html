@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.1.0-alpha.10] — 2026-05-28
+
+### Added
+- Precompile API: `compileToString(ast)` → JS source code, `compileToFile(ast, path)` → ESM module file
+- `precompile(inputDir, outputDir)` — scans `.html` files, compiles to JS, generates barrel `index.js`
+- Precompile CLI: `bun-html compile <inputDir> [--out <outputDir>]` with `--help` and `--version`
+- Benchmark expanded to 5 engines: ejs, handlebars, mustache, nunjucks (+ eta installed)
+- Benchmark metrics: memory usage (heapUsed delta), startup time (cold vs warm)
+- Fuzz testing: 14 edge case tests (deep nesting 50 levels, unicode, script tags, prototype pollution, whitespace, cache TTL under load, null/undefined data, large templates)
+- `getCacheStats()` — exposes template + compiled cache stats (hits, misses, evictions, memory)
+- `clearPartials()` now exported to public API
+- `BoundedCache` fully documented in README (TTL, purge, stats, per-entry TTL override)
+- Pipe/filter syntax, nullish coalescing `??`, array/object literals documented in README
+- Precompile CLI + barrel generation documented
+- `--version` / `-v` flag on CLI
+- `render()` now also enforces `MAX_TEMPLATE_LENGTH` (was only in `compile()`)
+
+### Changed
+- Plugin processing extracted to `processPlugins()` / `applyAfterRender()` shared helpers (30 duplicated lines eliminated)
+- `renderStream` backpressure uses `Bun.sleep(0)` instead of `setTimeout`
+- README: 491 lines (+88), 11 API functions documented, expression table now 8 rows, limitations updated
+
+### Fixed
+- Async path `CallExpression` now correctly binds `this` — `{{name.toUpperCase()}}` works in async mode (partialsDir, renderStream)
+- Async path limitation removed from docs — both sync and async paths have full expression support
+- `BoundedCache` constructor guards `max >= 1` (was unbounded negative possible)
+- Redundant `compile` import removed from source map test
+- CHANGELOG.md now excluded from `.gitignore` (was accidentally getting ignored)
+
+### Tests
+- 125 tests (+22 from alpha.9): 4 precompile + 14 fuzz + 4 edge fixes
+
 ## [0.1.0-alpha.9] — 2026-05-28
 
 ### Added
