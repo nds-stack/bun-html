@@ -136,7 +136,7 @@ export function renderStream(
           const chunk = await renderAsync([node], dt, opts)
           if (chunk) {
             if (controller.desiredSize !== null && controller.desiredSize <= 0) {
-              await new Promise(r => setTimeout(r, 0))
+              await Bun.sleep(0)
             }
             controller.enqueue(new TextEncoder().encode(chunk))
           }
