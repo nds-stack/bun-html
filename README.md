@@ -149,12 +149,12 @@ interface RenderOptions {
 - Mismatched close tags (`{{/if}}` without open) throw a `SyntaxError`
 - Missing variables render as empty string (no throw)
 - `null`/`undefined` values render as empty string
-- `{{> partial}}` without `partialsDir` set throws
-- Partials that don't exist throw (from `Bun.file().text()`)
+- `{{> partial}}` without matching `{{#def}}` or `partialsDir` throws
+- Partials from file throw on missing file (from `Bun.file().text()`)
 
 ## Limitations
 
-- Partials and layouts always require `partialsDir` and are async-only
+- File-based partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
 - Expression support limited to conditionals (`{{#if}}`, `{{#unless}}`) — variable interpolation uses simple path resolution
 - `{{../var}}` in conditionals only supports simple parent access, not compound expressions (`../age > 18` works but not `../user.age > 18 && ../active`)
@@ -277,6 +277,7 @@ app.get('/', (c) => {
 | Helpers | ✅ | ❌ | ✅ | ✅ |
 | Template caching | ✅ | ❌ | ✅ | ✅ |
 | Whitespace control | ✅ | ❌ | ✅ | ✅ |
+| Inline partials (`#def`) | ✅ | ❌ | ✅ | ❌ |
 | Expressions | ✅ | ❌ | ❌ | ✅ |
 
 ## Benchmarks
