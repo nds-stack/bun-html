@@ -35,6 +35,7 @@ export function tokenizeExpr(input: string): ExprToken[] {
         if (input[j] === quote) break
         j++
       }
+      if (j >= input.length) throw new Error(`Unterminated string literal starting at position ${i}`)
       tokens.push({ type: 'String', value: input.slice(i + 1, j) })
       i = j + 1
       continue

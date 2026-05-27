@@ -85,5 +85,9 @@ export function evaluateExpr(
       const cond = evaluateExpr(node.condition, data, index, key, stack)
       return cond ? evaluateExpr(node.then, data, index, key, stack) : evaluateExpr(node.else, data, index, key, stack)
     }
+    default: {
+      const _: never = node
+      return _
+    }
   }
 }
