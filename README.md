@@ -72,6 +72,24 @@ adapter.hono({ dir: './views' })
 
 See [Framework Adapters](#framework-adapters) for full usage.
 
+### `renderStream(template, data, options?)`
+
+Returns a `ReadableStream<Uint8Array>` for progressive HTML delivery:
+
+```ts
+import { renderStream } from '@nds-stack/bun-html'
+
+// Bun.serve() SSR with streaming
+Bun.serve({
+  async fetch(req) {
+    const stream = renderStream('<h1>{{title}}</h1>', { title: 'Hello' })
+    return new Response(stream, { headers: { 'Content-Type': 'text/html' } })
+  },
+})
+```
+
+Each top-level template node is pushed as a chunk. Works with partials, layouts, plugins, and all template features. Uses the async AST walker (not the compiled function).
+
 ### Template Tags
 
 | Tag | Description |
@@ -325,6 +343,7 @@ app.get('/', (c) => {
 | Whitespace control | ✅ | ❌ | ✅ | ✅ |
 | Inline partials (`#def`) | ✅ | ❌ | ✅ | ❌ |
 | Plugin system | ✅ | ❌ | ❌ | ❌ |
+| Stream rendering | ✅ | ❌ | ❌ | ❌ |
 | Expressions | ✅ | ❌ | ❌ | ✅ |
 
 ## Benchmarks

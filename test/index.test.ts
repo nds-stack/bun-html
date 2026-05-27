@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test'
-import { render, compile } from '../src/index.js'
+import { render, compile, renderStream } from '../src/index.js'
 
 describe('bun-html', () => {
 
@@ -421,6 +421,39 @@ describe('bun-html', () => {
       ],
     })
     expect(calls).toEqual(['a', 'b'])
+  })
+
+  test('renderStream returns ReadableStream with rendered content', async () => {
+    const stream = renderStream('Hello {{name}}!', { name: 'World' })
+    const reader = stream.getReader()
+    const decoder = new TextDecoder()
+    let result = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      result += decoder.decode(value)
+    }
+    expect(result).toBe('Hello World!')
+  })
+
+  test('renderStream handles each loops', async () => {
+    const stream = renderStream('{{#each items}}{{this}},{{/each}}', { items: ['a', 'b', 'c'] })
+    const reader = stream.getReader()
+    const decoder = new TextDecoder()
+    let result = ''
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      result += decoder.decode(value)
+    }
+    expect(result).toBe('a,b,c,')
+  })
+
+  test('renderStream can be used with Response for SSR', async () => {
+    const stream = renderStream('<h1>{{title}}</h1>', { title: 'Hello' })
+    const response = new Response(stream, { headers: { 'Content-Type': 'text/html' } })
+    const text = await response.text()
+    expect(text).toBe('<h1>Hello</h1>')
   })
 
 })

@@ -143,6 +143,31 @@ export function render(
   return output
 }
 
+const encoder = new TextEncoder()
+
+export function renderStream(
+  template: string,
+  data: Record<string, unknown>,
+  options?: RenderOptions,
+): ReadableStream<Uint8Array> {
+  const opts: RenderOptions = options ?? {}
+  const ast = parse(tokenize(template))
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        for (const node of ast) {
+          const chunk = await renderNodeAsync(node, data, opts, { stack: [data], defs: {} })
+          if (chunk) controller.enqueue(encoder.encode(chunk))
+        }
+        controller.close()
+      } catch (e) {
+        controller.error(e instanceof Error ? e : new Error(String(e)))
+      }
+    },
+  })
+}
+
 function getConditionValue(
   node: ASTNodeIf | ASTNodeUnless,
   data: unknown,

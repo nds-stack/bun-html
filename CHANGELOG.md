@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-alpha.7] — 2026-05-27
+
+### Added
+- Stream rendering: `renderStream()` returns `ReadableStream<Uint8Array>` for progressive HTML delivery
+- Works with `new Response(renderStream(...), { headers })` for Bun/Hono SSR
+- Uses AST walker (async path) — respects `partialsDir`, plugins, helpers
+
 ## [0.1.0-alpha.6] — 2026-05-27
 
 ### Added
