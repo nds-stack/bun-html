@@ -1,7 +1,37 @@
 import { render } from '../src/index.js'
 
 const data = { name: 'World', items: ['apple', 'banana', 'cherry'] }
-const tpl = '<h1>Hello {{name}}</h1><ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>'
+
+const templates: { name: string; bun: string; ejs: string; hbs: string; mustache: string }[] = [
+  {
+    name: 'Variable',
+    bun: 'Hello {{name}}',
+    ejs: 'Hello <%= name %>',
+    hbs: 'Hello {{name}}',
+    mustache: 'Hello {{name}}',
+  },
+  {
+    name: 'Loop (3 items)',
+    bun: '<ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>',
+    ejs: '<ul><% items.forEach(i => { %><li><%= i %></li><% }) %></ul>',
+    hbs: '<ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>',
+    mustache: '<ul>{{#items}}<li>{{.}}</li>{{/items}}</ul>',
+  },
+  {
+    name: 'Conditional + expression',
+    bun: '{{#if name == "World"}}Hello {{name}}{{/if}}',
+    ejs: '<% if (name === "World") { %>Hello <%= name %><% } %>',
+    hbs: '{{#if name}}Hello {{name}}{{/if}}',
+    mustache: '{{#name}}Hello {{name}}{{/name}}',
+  },
+  {
+    name: 'Combined',
+    bun: '<h1>Hello {{name}}</h1><ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>{{#if name == "World"}}!{{/if}}',
+    ejs: '<h1>Hello <%= name %></h1><ul><% items.forEach(i => { %><li><%= i %></li><% }) %></ul><% if (name === "World") { %>!<% } %>',
+    hbs: '<h1>Hello {{name}}</h1><ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>{{#if name}}!{{/if}}',
+    mustache: '<h1>Hello {{name}}</h1><ul>{{#items}}<li>{{.}}</li>{{/items}}</ul>{{#name}}!{{/name}}',
+  },
+]
 
 function format(n: number): string {
   if (n > 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
@@ -9,8 +39,7 @@ function format(n: number): string {
   return `${n}`
 }
 
-async function bench(_label: string, fn: () => string | Promise<string>, iterations = 5000): Promise<number> {
-  // warmup
+async function bench(fn: () => string | Promise<string>, iterations = 5000): Promise<number> {
   for (let i = 0; i < 100; i++) fn()
 
   const start = performance.now()
@@ -19,43 +48,45 @@ async function bench(_label: string, fn: () => string | Promise<string>, iterati
     fn()
   }
   const elapsed = performance.now() - start
-  const ops = Math.round(iterations / (elapsed / 1000))
-  return ops
+  return Math.round(iterations / (elapsed / 1000))
 }
 
 async function main() {
-  const results: Record<string, number> = {}
+  const ejsMod = await import('ejs').then(m => m.default).catch(() => null)
+  const hbsMod = await import('handlebars').then(m => m.default).catch(() => null)
+  const mustacheMod = await import('mustache').then(m => m.default).catch(() => null)
 
-  results['@nds-stack/bun-html (no cache)'] = await bench('no cache', () => render(tpl, data, { cache: false }))
-  results['@nds-stack/bun-html (cached)'] = await bench('cached', () => render(tpl, data))
+  const results: Record<string, Record<string, number>> = {}
 
-  try {
-    const { default: ejs } = await import('ejs')
-    const ejsFn = ejs.compile('<h1>Hello <%= name %></h1><ul><% items.forEach(i => { %><li><%= i %></li><% }) %></ul>')
-    results['ejs'] = await bench('ejs', () => ejsFn(data))
-  } catch {}
+  for (const tpl of templates) {
+    const row: Record<string, number> = {}
 
-  try {
-    const { default: handlebars } = await import('handlebars')
-    const hbs = handlebars.compile('<h1>Hello {{name}}</h1><ul>{{#each items}}<li>{{this}}</li>{{/each}}</ul>')
-    results['handlebars'] = await bench('handlebars', () => hbs(data))
-  } catch {}
+    row['bun'] = await bench(() => render(tpl.bun, data, { cache: false }))
 
-  try {
-    const { default: mustache } = await import('mustache')
-    results['mustache'] = await bench('mustache', () =>
-      mustache.render('<h1>Hello {{name}}</h1><ul>{{#items}}<li>{{.}}</li>{{/items}}</ul>', data),
-    )
-  } catch {}
+    if (ejsMod) {
+      const fn = ejsMod.compile(tpl.ejs)
+      row['ejs'] = await bench(() => fn(data))
+    }
+    if (hbsMod) {
+      const fn = hbsMod.compile(tpl.hbs)
+      row['hbs'] = await bench(() => fn(data))
+    }
+    if (mustacheMod) {
+      row['mustache'] = await bench(() => mustacheMod.render(tpl.mustache, data))
+    }
+
+    results[tpl.name] = row
+  }
 
   console.log(`\nBenchmark: HTML template rendering (ops/sec, higher is better)\n`)
-  console.log(`| Library | Throughput | vs bun-html (cached) |`)
-  console.log(`|---------|------------|---------------------|`)
-  const baseline = results['@nds-stack/bun-html (cached)']
-  for (const [name, ops] of Object.entries(results)) {
-    const pct = baseline ? (((ops - baseline) / baseline) * 100).toFixed(0) : '-'
-    const pctStr = name === '@nds-stack/bun-html (cached)' ? '-' : `${pct > '0' ? '+' : ''}${pct}%`
-    console.log(`| ${name} | ${format(ops)} ops/s | ${pctStr} |`)
+  console.log(`Template | @nds-stack/bun-html | ejs | handlebars | mustache |`)
+  console.log(`---------|-------------------|------|------------|----------|`)
+
+  for (const tpl of templates) {
+    const r = results[tpl.name]!
+    console.log(
+      `${tpl.name} | ${format(r.bun ?? 0)} | ${format(r.ejs ?? 0)} | ${format(r.hbs ?? 0)} | ${format(r.mustache ?? 0)} |`,
+    )
   }
   console.log()
 }
