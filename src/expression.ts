@@ -28,11 +28,12 @@ export function tokenizeExpr(input: string): ExprToken[] {
     }
 
     if (/\d/.test(input[i]!)) {
-      let j = i
-      while (j < input.length && /[\d.eE+-]/.test(input[j]!)) j++
-      tokens.push({ type: 'Number', value: input.slice(i, j) })
-      i = j
-      continue
+      const numMatch = input.slice(i).match(/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/)
+      if (numMatch) {
+        tokens.push({ type: 'Number', value: numMatch[0] })
+        i += numMatch[0].length
+        continue
+      }
     }
 
     if (/[a-zA-Z_$]/.test(input[i]!)) {

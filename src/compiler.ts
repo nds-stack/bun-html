@@ -129,8 +129,7 @@ function genSafePath(expression: string): string {
 
   if (levels > 0) {
     if (!rest || rest === 'this') return `__s[Math.max(0, __s.length - ${levels})]`
-    if (rest === '@index') return '_i'
-    if (rest === '@key') return '_keys[_i]'
+    if (rest === '@index' || rest === '@key') throw new Error(`Cannot access ${rest} from parent context`)
     const parts = rest.split('.')
     let code = `__s[Math.max(0, __s.length - ${levels})]`
     for (const part of parts) {

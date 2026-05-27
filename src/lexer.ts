@@ -61,6 +61,7 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'WithOpen', value: content.replace(/^#with\s*/, '').trim() })
     } else if (/^#layout(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#layout\s*/, '').trim().replace(/^"|"$/g, '')
+      if (name.includes('"') || name.includes(' ')) throw new Error(`Invalid layout syntax: "${content}"`)
       tokens.push({ type: 'LayoutOpen', value: name })
     } else if (content.startsWith('>')) {
       tokens.push({ type: 'Partial', value: content.slice(1).trim() })
