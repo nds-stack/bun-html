@@ -1,0 +1,46 @@
+{
+  "name": "@nds-stack/bun-html",
+  "version": "0.1.0-alpha.0",
+  "description": "Zero-dependency Bun-native HTML template engine with mustache-like syntax, auto-escape, async partials, and helpers",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "bun run clean && bun build ./src/index.ts --outdir ./dist --target bun --format esm && tsc -p tsconfig.build.json",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "bench": "bun bench/html.bench.ts"
+  },
+  "devDependencies": {
+    "@types/ejs": "^3.1.5",
+    "@types/mustache": "^4.2.6",
+    "bun-types": "latest",
+    "ejs": "^3.1.10",
+    "handlebars": "^4.7.8",
+    "mustache": "^4.2.0",
+    "typescript": "^6.0.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nds-stack/bun-html"
+  },
+  "keywords": [
+    "bun",
+    "html",
+    "template",
+    "mustache",
+    "template-engine",
+    "ssr"
+  ],
+  "license": "MIT"
+}

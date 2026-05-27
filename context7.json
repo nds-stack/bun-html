@@ -1,0 +1,7 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "@nds-stack/bun-html",
+  "description": "Zero-dependency Bun-native HTML template engine with mustache-like syntax, auto-escape, async partials, and helpers.",
+  "url": "https://context7.com/nds-stack/bun-html",
+  "public_key": "pk_Zd1vpPPhPhvxg6ZjZWp5g"
+}
