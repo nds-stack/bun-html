@@ -31,13 +31,6 @@ export function validateKey(key: string): void {
   }
 }
 
-export function formatPosition(token: Token): string {
-  if (token.line !== undefined && token.column !== undefined) {
-    return ` at line ${token.line}, column ${token.column}`
-  }
-  return ''
-}
-
 export interface ASTNodeText { type: 'Text'; value: string }
 export interface ASTNodeVariable { type: 'Variable'; expression: string }
 export interface ASTNodeRawVariable { type: 'RawVariable'; expression: string }
