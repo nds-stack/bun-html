@@ -85,7 +85,14 @@ export function evaluateExpr(
       const callee = evaluateExpr(node.callee, data, index, key, stack)
       if (typeof callee !== 'function') return undefined
       const args = node.args.map(a => evaluateExpr(a, data, index, key, stack))
-      return callee(...args)
+
+      let receiver: unknown = undefined
+      if (node.callee.type === 'Identifier' && node.callee.path.length > 1) {
+        const parentPath = node.callee.path.slice(0, -1)
+        receiver = evaluateExpr({ type: 'Identifier', path: parentPath }, data, index, key, stack)
+      }
+
+      return callee.apply(receiver, args)
     }
     case 'Ternary': {
       const cond = evaluateExpr(node.condition, data, index, key, stack)

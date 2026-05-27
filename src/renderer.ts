@@ -1,4 +1,4 @@
-import type { ASTNode, RenderOptions, CompiledTemplate } from './types.js'
+import type { ASTNode, RenderOptions, CompiledTemplate, Plugin } from './types.js'
 import { tokenize } from './lexer.js'
 import { parse } from './parser.js'
 import { compileToFunction } from './compiler.js'
@@ -10,6 +10,35 @@ const NO_ESCAPE = (s: string): string => s
 
 const templateCache = new BoundedCache<string, ASTNode[]>()
 const compiledCache = new BoundedCache<string, CompiledTemplate>()
+
+interface ProcessedPlugins {
+  opts: RenderOptions
+  tpl: string
+  dt: Record<string, unknown>
+}
+
+function processPlugins(template: string, data: Record<string, unknown>, options: RenderOptions | undefined, plugins: Plugin[]): ProcessedPlugins {
+  let mergedHelpers = options?.helpers
+  let tpl = template
+  let dt = data
+
+  for (const plugin of plugins) {
+    if (plugin.helpers) mergedHelpers = { ...mergedHelpers, ...plugin.helpers }
+    if (plugin.beforeRender) {
+      const r = plugin.beforeRender(tpl, dt, options ?? {})
+      tpl = r.template; dt = r.data
+    }
+  }
+
+  return { opts: { ...(options ?? {}), helpers: mergedHelpers }, tpl, dt }
+}
+
+function applyAfterRender(output: string, data: Record<string, unknown>, plugins: Plugin[]): string {
+  for (const plugin of plugins) {
+    if (plugin.afterRender) output = plugin.afterRender(output, data)
+  }
+  return output
+}
 
 export function clearCache(): void {
   templateCache.clear()
@@ -53,31 +82,15 @@ export function render(
   options?: RenderOptions,
 ): string | Promise<string> {
   if (template.length > MAX_TEMPLATE_LENGTH) throw new Error(`Template exceeds maximum length of ${MAX_TEMPLATE_LENGTH}`)
-  let opts: RenderOptions = options ?? {}
 
-  const plugins = opts.plugins ?? []
-  let mergedHelpers = opts.helpers
-  let tpl = template
-  let dt = data
-
-  for (const plugin of plugins) {
-    if (plugin.helpers) mergedHelpers = { ...mergedHelpers, ...plugin.helpers }
-    if (plugin.beforeRender) {
-      const r = plugin.beforeRender(tpl, dt, opts)
-      tpl = r.template; dt = r.data
-    }
-  }
-
-  opts = { ...opts, helpers: mergedHelpers }
+  const plugins = options?.plugins ?? []
+  const { opts, tpl, dt } = processPlugins(template, data, options, plugins)
 
   if (opts.partialsDir) {
     const ast = compile(tpl, opts)
     return (async () => {
       let output = await renderAsync(ast, dt, opts)
-      for (const plugin of plugins) {
-        if (plugin.afterRender) output = plugin.afterRender(output, dt)
-      }
-      return output
+      return applyAfterRender(output, dt, plugins)
     })()
   }
 
@@ -98,12 +111,8 @@ export function render(
   }
 
   const esc = opts.autoescape !== false ? Bun.escapeHTML : NO_ESCAPE
-  let output = fn(dt, mergedHelpers, esc)
-
-  for (const plugin of plugins) {
-    if (plugin.afterRender) output = plugin.afterRender(output, dt)
-  }
-  return output
+  let output = fn(dt, opts.helpers, esc)
+  return applyAfterRender(output, dt, plugins)
 }
 
 export function renderStream(
@@ -111,22 +120,8 @@ export function renderStream(
   data: Record<string, unknown>,
   options?: RenderOptions,
 ): ReadableStream<Uint8Array> {
-  let opts: RenderOptions = options ?? {}
-
-  const plugins = opts.plugins ?? []
-  let mergedHelpers = opts.helpers
-  let tpl = template
-  let dt = data
-
-  for (const plugin of plugins) {
-    if (plugin.helpers) mergedHelpers = { ...mergedHelpers, ...plugin.helpers }
-    if (plugin.beforeRender) {
-      const r = plugin.beforeRender(tpl, dt, opts)
-      tpl = r.template; dt = r.data
-    }
-  }
-
-  opts = { ...opts, helpers: mergedHelpers }
+  const plugins = options?.plugins ?? []
+  const { opts, tpl, dt } = processPlugins(template, data, options, plugins)
   const ast = compile(tpl, opts)
 
   return new ReadableStream({
