@@ -467,7 +467,6 @@ describe('bun-html', () => {
 
   test('compileToFunction attaches source map', () => {
     const { compileToFunction } = require('../src/index.js')
-    const { compile } = require('../src/index.js')
     const ast = compile('{{name}}')
     const fn = compileToFunction(ast)
     const map = (fn as unknown as Record<string, unknown>).__sourceMap as { generatedLine: number; sourceLine: number; sourceColumn: number }[]

@@ -37,7 +37,7 @@ export class BoundedCache<K, V> {
   private keyBytes: Map<K, number>
 
   constructor(max: number = DEFAULT_CACHE_SIZE, defaultTtl: number = 0) {
-    this.max = max
+    this.max = Math.max(1, max)
     this.defaultTtl = defaultTtl
     this.map = new Map()
     this.hits = 0
