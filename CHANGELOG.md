@@ -7,6 +7,17 @@
 - Full operator precedence: `!`, `-` (unary), `*`, `/`, `+`, `-`, comparison, `&&`, `||`, ternary
 - Expression support in `{{var}}` and `{{{var}}}` (previously only in `{{#if}}`)
 
+### Fixed
+- Async path (partialsDir): parent context `../var` now correctly pushes parent scope instead of current item in `Each` and `With` blocks
+- `evaluateExpr` now allows property access on primitive values (string, number) — fixes `{{name.toUpperCase()}}` in async path
+- `purgeTemplate` now returns `true` if either template or compiled cache was purged
+- Removed dead code branch in `genExpr` CallExpression
+- String tokenizer handles escape sequences (`\"`, `\\`)
+- `validatePartialName` rejects empty names
+- Single quote in partial name no longer breaks generated error message
+- `callee(...args)` now used instead of `callee.apply(null, args)` for consistency with compiled path
+- README limitation updated: compiled path supports full expressions; async path limited to conditionals
+
 ## [0.1.0-alpha.3] — 2026-05-27
 
 ### Added
