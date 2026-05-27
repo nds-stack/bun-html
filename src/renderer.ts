@@ -16,11 +16,17 @@ class BoundedCache<K, V> {
   }
 
   get(key: K): V | undefined {
-    return this.map.get(key)
+    if (!this.map.has(key)) return undefined
+    const value = this.map.get(key)
+    this.map.delete(key)
+    this.map.set(key, value!)
+    return value
   }
 
   set(key: K, value: V): void {
-    if (!this.map.has(key) && this.map.size >= this.max) {
+    if (this.map.has(key)) {
+      this.map.delete(key)
+    } else if (this.map.size >= this.max) {
       const first = this.map.keys().next().value
       if (first !== undefined) this.map.delete(first as unknown as K)
     }
@@ -126,6 +132,7 @@ export function render(
     fn = compiledCache.get(tpl)
     if (!fn) {
       const ast = parse(tokenize(tpl))
+      templateCache.set(tpl, ast)
       fn = compileToFunction(ast)
       compiledCache.set(tpl, fn)
     }
@@ -151,13 +158,31 @@ export function renderStream(
   options?: RenderOptions,
 ): ReadableStream<Uint8Array> {
   const opts: RenderOptions = options ?? {}
-  const ast = parse(tokenize(template))
+
+  const plugins = opts.plugins ?? []
+  let mergedHelpers = opts.helpers
+  let tpl = template
+  let dt = data
+
+  for (const plugin of plugins) {
+    if (plugin.helpers) {
+      mergedHelpers = { ...mergedHelpers, ...plugin.helpers }
+    }
+    if (plugin.beforeRender) {
+      const result = plugin.beforeRender(tpl, dt, opts)
+      tpl = result.template
+      dt = result.data
+    }
+  }
+
+  opts.helpers = mergedHelpers
+  const ast = compile(tpl, opts)
 
   return new ReadableStream({
     async start(controller) {
       try {
         for (const node of ast) {
-          const chunk = await renderNodeAsync(node, data, opts, { stack: [data], defs: {} })
+          const chunk = await renderNodeAsync(node, dt, opts, { stack: [dt], defs: {} })
           if (chunk) controller.enqueue(encoder.encode(chunk))
         }
         controller.close()
@@ -220,7 +245,7 @@ async function renderNodeAsync(
       const raw = resolveValue(node.expression, data, ctx.index, ctx.key, ctx.stack)
       if (!raw || typeof raw !== 'object') return ''
 
-      const entries = Array.isArray(raw) ? raw : Object.values(raw)
+      const entries = Object.values(raw)
       const keys = Array.isArray(raw)
         ? entries.map((_, i) => String(i))
         : Object.keys(raw)

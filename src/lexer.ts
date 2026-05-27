@@ -63,7 +63,8 @@ export function tokenize(template: string): Token[] {
       tokens.push({ type: 'WithOpen', value: content.replace(/^#with\s*/, '').trim() })
     } else if (/^#def(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#def\s*/, '').trim().replace(/^"|"$/g, '')
-      if (name.includes('"') || name.includes(' ') || !name) throw new Error(`Invalid def syntax: "${content}"`)
+      if (!name) throw new Error(`Def name cannot be empty: "${content}"`)
+      if (name.includes('"') || name.includes(' ')) throw new Error(`Invalid def syntax: "${content}"`)
       tokens.push({ type: 'DefOpen', value: name })
     } else if (/^#layout(?:\s+|$)/.test(content)) {
       const name = content.replace(/^#layout\s*/, '').trim().replace(/^"|"$/g, '')
