@@ -456,4 +456,28 @@ describe('bun-html', () => {
     expect(text).toBe('<h1>Hello</h1>')
   })
 
+  test('security: prototype pollution blocked (__proto__)', () => {
+    const result = render('{{name}}', { name: 'safe', __proto__: { isAdmin: true } })
+    expect(result).not.toContain('isAdmin')
+  })
+
+  test('security: dangerous keys throw (constructor)', () => {
+    expect(() => render('{{constructor}}', {})).toThrow()
+  })
+
+  test('security: dangerous keys throw (prototype)', () => {
+    expect(() => render('{{prototype}}', {})).toThrow()
+  })
+
+  test('clearCache + purgeTemplate purges compiled templates', () => {
+    const { clearCache, purgeTemplate } = require('../src/index.js')
+    const tpl = '{{name}}'
+    render(tpl, { name: 'A' })
+    const hit = purgeTemplate(tpl)
+    expect(hit).toBe(true)
+    const miss = purgeTemplate('never-cached')
+    expect(miss).toBe(false)
+    clearCache()
+  })
+
 })
