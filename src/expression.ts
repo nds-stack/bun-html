@@ -207,11 +207,19 @@ export function evaluateExpr(
       return !evaluateExpr(node.operand, data, index, key)
     }
     case 'BinaryOp': {
+      if (node.op === '&&') {
+        const left = evaluateExpr(node.left, data, index, key)
+        if (!left) return left
+        return evaluateExpr(node.right, data, index, key)
+      }
+      if (node.op === '||') {
+        const left = evaluateExpr(node.left, data, index, key)
+        if (left) return left
+        return evaluateExpr(node.right, data, index, key)
+      }
       const left = evaluateExpr(node.left, data, index, key)
       const right = evaluateExpr(node.right, data, index, key)
       switch (node.op) {
-        case '&&': return left && right
-        case '||': return left || right
         case '>': return Number(left) > Number(right)
         case '<': return Number(left) < Number(right)
         case '>=': return Number(left) >= Number(right)

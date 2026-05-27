@@ -19,7 +19,7 @@ class BoundedCache<K, V> {
   }
 
   set(key: K, value: V): void {
-    if (this.map.size >= this.max) {
+    if (!this.map.has(key) && this.map.size >= this.max) {
       const first = this.map.keys().next().value
       if (first !== undefined) this.map.delete(first as unknown as K)
     }
@@ -40,7 +40,13 @@ class BoundedCache<K, V> {
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
+  return typeof value === 'object' && value !== null
+}
+
+function validatePartialName(name: string): void {
+  if (/\.\.|[\\\/]/.test(name)) {
+    throw new Error(`Invalid partial/layout name: "${name}"`)
+  }
 }
 
 const templateCache = new BoundedCache<string, ASTNode[]>()
@@ -279,6 +285,7 @@ async function renderNodeAsync(
     case 'Partial': {
       const dir = options.partialsDir
       if (!dir) throw new Error('Partials require partialsDir option')
+      validatePartialName(node.name)
 
       const cacheKey = `${dir}/${node.name}`
       let partialAst: ASTNode[]
@@ -302,6 +309,7 @@ async function renderNodeAsync(
     case 'Layout': {
       const dir = options.partialsDir
       if (!dir) throw new Error('Layouts require partialsDir option')
+      validatePartialName(node.name)
 
       let content = ''
       for (const child of node.children) {
