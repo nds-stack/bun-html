@@ -137,8 +137,8 @@ function parseIf(tokens: Token[], i: number): ParseResult {
     if (expression.trim()) {
       exprAst = parseExpression(expression)
     }
-  } catch {
-    // If expression parsing fails, treat as simple identifier (backward compat)
+  } catch (e) {
+    throw new Error(`Invalid expression in {{#if}}: "${expression}" — ${(e as Error).message}`)
   }
 
   return { node: { type: 'If', expression, exprAst, children: thenChildren, elseChildren }, nextIndex: i }
@@ -161,8 +161,8 @@ function parseUnless(tokens: Token[], i: number): ParseResult {
     if (expression.trim()) {
       exprAst = parseExpression(expression)
     }
-  } catch {
-    // If expression parsing fails, treat as simple identifier
+  } catch (e) {
+    throw new Error(`Invalid expression in {{#unless}}: "${expression}" — ${(e as Error).message}`)
   }
 
   return { node: { type: 'Unless', expression, exprAst, children }, nextIndex: i }
