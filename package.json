@@ -1,12 +1,12 @@
 {
   "name": "@nds-stack/bun-html",
-  "version": "0.1.0-alpha.11",
+  "version": "0.1.0-alpha.12",
   "description": "Zero-dependency Bun-native HTML template engine with mustache-like syntax, auto-escape, async partials, and helpers",
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
   "bin": {
-    "bun-html": "./dist/cli.js"
+    "bun-html": "./bin/bun-html.js"
   },
   "exports": {
     ".": {
@@ -15,7 +15,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bin"
   ],
   "scripts": {
     "clean": "rm -rf dist",
