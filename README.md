@@ -1,5 +1,7 @@
 # @nds-stack/bun-html
 
+[![npm version](https://img.shields.io/npm/v/%40nds-stack%2Fbun-html?color=blue&logo=npm)](https://www.npmjs.com/package/@nds-stack/bun-html) [![Bun](https://img.shields.io/badge/Bun-%3E%3D1.3.0-black?logo=bun)](https://bun.sh) [![TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org) [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 Zero-dependency Bun-native HTML template engine with mustache-like syntax, auto-escape via `Bun.escapeHTML()`, async partials via `Bun.file()`, and custom helpers.
 
 ```ts
