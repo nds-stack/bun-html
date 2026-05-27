@@ -47,7 +47,7 @@ export function evaluateExpr(
     }
     case 'UnaryMinus': {
       const val = evaluateExpr(node.operand, data, index, key, stack)
-      return -Number(val)
+      return val == null ? 0 : -Number(val)
     }
     case 'BinaryOp': {
       if (node.op === '&&') {
@@ -73,6 +73,7 @@ export function evaluateExpr(
         case '-': return Number(left) - Number(right)
         case '*': return Number(left) * Number(right)
         case '/': return Number(left) / Number(right)
+        default: { const _: never = node.op; return _ }
       }
     }
     case 'CallExpression': {

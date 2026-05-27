@@ -131,7 +131,7 @@ function parseTokens(tokens: ExprToken[]): ExprNode {
           while (rest.startsWith('../')) { levels++; rest = rest.slice(3) }
           const parts: string[] = []
           for (let i = 0; i < levels; i++) parts.push('..')
-          parts.push(...rest.split('.'))
+          if (rest) parts.push(...rest.split('.'))
           return { type: 'Identifier', path: parts }
         }
         return { type: 'Identifier', path: val.split('.') }

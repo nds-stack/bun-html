@@ -209,6 +209,7 @@ Each call to `render()` is stateless. Caches (`templateCache`, `partialCache`) a
 - **Cross-instance:** No shared state — each process has its own cache
 - **Worker threads:** Each worker has its own cache (module-level)
 - **Cache invalidation:** Call `compile(template, { cache: false })` to bypass
+- **Cache keys:** Templates are cached by raw string content — whitespace differences create separate cache entries
 
 ## Customization Guide
 
