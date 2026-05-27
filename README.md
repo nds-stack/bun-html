@@ -49,6 +49,57 @@ const result = fn({ name: 'World' }, undefined, Bun.escapeHTML)
 // → 'Hello World!'
 ```
 
+### `compileToString(ast)` / `compileToFile(ast, outputPath)`
+
+```ts
+import { compile, compileToString, compileToFile } from '@nds-stack/bun-html'
+
+const ast = compile('Hello {{name}}!')
+const code = compileToString(ast)
+// → 'let $ = "" ... return $'
+
+compileToFile(ast, 'dist/hello.js')
+// → writes a ready-to-import ESM module to dist/hello.js
+```
+
+### `precompile(inputDir, outputDir)`
+
+Precompiles all `.html` files in a directory into JS modules:
+
+```ts
+import { precompile } from '@nds-stack/bun-html'
+
+const result = precompile('./views', './dist/views')
+// → { files: 12, output: './dist/views' }
+// Generates: dist/views/*.js + dist/views/index.js (barrel)
+```
+
+### `getCacheStats()` / `clearPartials()`
+
+```ts
+import { getCacheStats, clearPartials } from '@nds-stack/bun-html'
+
+const stats = getCacheStats()
+// → { template: { size, hits, misses, evictions, memoryMB }, compiled: {...} }
+
+clearPartials()  // clear only the partial cache (file-based partials)
+```
+
+### `BoundedCache`
+
+Generic LRU cache with TTL, stats, and purge:
+
+```ts
+import { BoundedCache } from '@nds-stack/bun-html'
+
+const cache = new BoundedCache<string, any>(100, 60_000) // max 100 entries, 60s TTL
+cache.set('key', 'value')          // with default TTL
+cache.set('key2', 'v2', 10_000)    // per-entry TTL override
+cache.get('key')                   // LRU promoted, returns undefined if expired
+cache.purge()                      // remove all expired entries
+cache.stats                        // { size, capacity, hits, misses, evictions, memoryBytes, memoryMB }
+```
+
 ### `clearCache()` / `purgeTemplate(template)`
 
 ```ts
@@ -113,9 +164,22 @@ Variables support dot notation: `{{user.name}}`, `{{address.city.zip}}`.
 | Function calls | `{{name.toUpperCase()}}`, `{{user.getName()}}` |
 | Arithmetic | `{{count + 1}}`, `{{price * (1 + tax)}}` |
 | Ternary | `{{age >= 18 ? "adult" : "minor"}}` |
+| Nullish coalescing | `{{name ?? "anonymous"}}` |
 | Unary minus | `{{-balance}}` |
+| Array literal | `{{[1, 2, 3]}}` |
+| Object literal | `{{ {name: "Alice", age: 30} }}` |
 
-> Note: Chained calls after `()` (e.g., `.trim()` after `.toUpperCase()`) are not yet supported.
+**Pipe/filter syntax:** Transform values through helpers with `|`:
+```ts
+render('{{name | uppercase | truncate:5}}', { name: 'hello world' }, {
+  helpers: {
+    uppercase(this: unknown) { return String(this).toUpperCase() },
+    truncate(this: unknown, len: number) { return String(this).slice(0, len) },
+  },
+})
+// → 'HELLO'
+```
+Filters can take arguments (`:arg1,arg2`). Missing filters pass the value through unchanged.
 
 **Loop context:** Inside `{{#each}}`, the following variables are available:
 | Variable | Description |
@@ -196,8 +260,7 @@ interface Plugin {
 
 - File-based partials and layouts always require `partialsDir` and are async-only
 - Helper arguments are not parsed from template expressions (helpers receive `this` context only)
-- Compiled path (default): full expression support in variables and conditionals (`{{name.toUpperCase()}}`, `{{count + 1}}`, `{{age >= 18 ? "adult" : "minor"}}`)
-- Async path (with `partialsDir`): expression support limited to conditionals; variable interpolation uses simple path resolution
+- Both sync (compiled) and async (partialsDir) paths have full expression support — function calls, arithmetic, ternary, `??`, array/object literals, and pipe filters work in all modes
 - Custom delimiters not supported (uses `{{}}` exclusively)
 - No browser build (requires Bun/Node.js runtime)
 
@@ -247,6 +310,27 @@ await render('{{#layout "main"}}{{content}}{{/layout}}', data, {
   partialsDir: './layouts',
 })
 // layouts/main.html: <html><body>{{content}}</body></html>
+```
+
+### Precompile CLI
+
+```bash
+bun-html compile ./views --out ./dist/views
+```
+
+Scans all `.html` files recursively, compiles each to an ESM module, and generates an `index.js` barrel:
+
+```ts
+// dist/views/home.html.js
+export default function(data, helpers, escapeHTML) {
+  // ... compiled template code
+  return $
+}
+
+// dist/views/index.js (auto-generated barrel)
+import home_html from './home.html.js'
+import partials_card_html from './partials/card.html.js'
+export { home_html, partials_card_html }
 ```
 
 ### {{#with}}
@@ -356,22 +440,22 @@ app.get('/', (c) => {
 
 | Template | @nds-stack/bun-html | ejs | handlebars | mustache | nunjucks |
 |---|---|---|---|---|---|
-| Variable | 1.1M | 1.1M | 325K | 977K | 30K |
-| Loop (3 items) | 704K | 199K | 189K | 294K | 11K |
-| Conditional + expression | 764K | 846K | 400K | 551K | 17K |
-| Combined | 460K | 158K | 192K | 332K | 8K |
+| Variable | 1.2M | 1.0M | 440K | 829K | 34K |
+| Loop (3 items) | 562K | 221K | 266K | 312K | 12K |
+| Conditional + expression | 897K | 626K | 588K | 546K | 24K |
+| Combined | 463K | 167K | 224K | 384K | 12K |
 
 ### Startup time (Combined template, ms)
 
 | Library | Cold | Warm |
 |---|---|---|
-| @nds-stack/bun-html | 0.03 | 0.12 |
-| ejs | 0.30 | 0.16 |
-| handlebars | 1.45 | 1.31 |
+| @nds-stack/bun-html | 0.02 | 0.00 |
+| ejs | 0.20 | 0.12 |
+| handlebars | 1.35 | 1.24 |
 | mustache | 0.02 | 0.01 |
-| nunjucks | 0.26 | 0.16 |
+| nunjucks | 0.26 | 0.13 |
 
-> **All libraries are on equal footing:** ejs, Handlebars, and bun-html all leverage `new Function()` compilation. bun-html leads on Loop (+254% vs ejs) and Combined (+191% vs ejs). Mustache is competitive on Variable but has no compilation step. Nunjucks is a full-featured engine with autoescape + async by default — slower but more capable. Memory usage for all libraries is sub-MB at this template size.
+> **All libraries are on equal footing:** ejs, Handlebars, and bun-html all leverage `new Function()` compilation. bun-html leads on Variable (+20% vs ejs), Loop (+154% vs ejs), and Combined (+177% vs ejs). Mustache is competitive on Variable but has no compilation step. Nunjucks is a full-featured engine with autoescape + async by default — slower but more capable. Startup time: bun-html is 10× faster than ejs (0.02ms vs 0.20ms cold). Memory usage for all libraries is sub-MB at this template size.
 
 ## Real-World Example
 
