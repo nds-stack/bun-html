@@ -106,14 +106,17 @@ export function render(
     }
   }
 
+  opts.helpers = mergedHelpers
+
   if (opts.partialsDir) {
     const ast = compile(tpl, opts)
-    return renderAsync(ast, dt, opts).then((output: string) => {
+    return (async () => {
+      let output = await renderAsync(ast, dt, opts)
       for (const plugin of plugins) {
         if (plugin.afterRender) output = plugin.afterRender(output, dt)
       }
       return output
-    })
+    })()
   }
 
   const doCache = opts.cache !== false
