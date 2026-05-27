@@ -8,6 +8,10 @@
 - Plugin helpers override user helpers for same key
 - Multiple plugins run in order (FIFO)
 
+### Fixed
+- Plugin helpers now correctly passed to async path (partialsDir mode)
+- `.then()` chain replaced with `async/await` in render function
+
 ## [0.1.0-alpha.5] — 2026-05-27
 
 ### Fixed

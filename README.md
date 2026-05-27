@@ -154,6 +154,17 @@ interface RenderOptions {
 }
 ```
 
+### Plugin Interface
+
+```ts
+interface Plugin {
+  name: string
+  helpers?: Record<string, (this: unknown, ...args: unknown[]) => unknown>
+  beforeRender?: (template: string, data: Record<string, unknown>, options: RenderOptions) => { template: string; data: Record<string, unknown> }
+  afterRender?: (output: string, data: Record<string, unknown>) => string
+}
+```
+
 ## Error Handling
 
 - Unclosed block tags (`{{#each}}`, `{{#if}}`, etc.) throw a `SyntaxError`
@@ -313,6 +324,7 @@ app.get('/', (c) => {
 | Template caching | ✅ | ❌ | ✅ | ✅ |
 | Whitespace control | ✅ | ❌ | ✅ | ✅ |
 | Inline partials (`#def`) | ✅ | ❌ | ✅ | ❌ |
+| Plugin system | ✅ | ❌ | ❌ | ❌ |
 | Expressions | ✅ | ❌ | ❌ | ✅ |
 
 ## Benchmarks
